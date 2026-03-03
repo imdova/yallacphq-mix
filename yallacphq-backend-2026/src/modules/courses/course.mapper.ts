@@ -1,0 +1,41 @@
+import type { ApiCourse } from '../../contracts';
+import type { CourseDocument } from './schemas/course.schema';
+
+export function toApiCourse(course: CourseDocument): ApiCourse {
+  return {
+    id: course.id,
+    title: course.title,
+    tag: course.tag,
+    rating: course.rating ?? 0,
+    reviewCount: course.reviewCount ?? 0,
+    description: course.description,
+    whoCanAttend: course.whoCanAttend,
+    whyYalla: course.whyYalla,
+    includes: course.includes,
+    instructorName: course.instructorName,
+    instructorTitle: course.instructorTitle,
+    durationHours: course.durationHours,
+    enrolledCount: course.enrolledCount,
+    lessons: course.lessons,
+    status: course.status,
+    visibility: course.visibility,
+    enableEnrollment: course.enableEnrollment,
+    requireApproval: course.requireApproval,
+    socialSharing: course.socialSharing,
+    priceRegular: course.priceRegular,
+    priceSale: course.priceSale,
+    availability: course.availability,
+    enablePromoCode: course.enablePromoCode,
+    currency: course.currency,
+    discountPercent: course.discountPercent,
+    level: course.level,
+    certificationType: course.certificationType,
+    imagePlaceholder: course.imagePlaceholder,
+    imageUrl: course.imageUrl,
+    instructorImageUrl: course.instructorImageUrl,
+    videoPreviewUrl: course.videoPreviewUrl,
+    seoTitle: course.seoTitle,
+    seoDescription: course.seoDescription,
+    seoKeywords: course.seoKeywords,
+  };
+}

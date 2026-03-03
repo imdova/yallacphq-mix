@@ -1,0 +1,9 @@
+export { HomeHeader } from "./HomeHeader";
+export { Hero } from "./Hero";
+export { StatsSection } from "./StatsSection";
+export { CoursesSection } from "./CoursesSection";
+export { WhyChooseSection } from "./WhyChooseSection";
+export { WebinarsPromoSection } from "./WebinarsPromoSection";
+export { TestimonialSection } from "./TestimonialSection";
+export { CTASection } from "./CTASection";
+export { HomeFooter } from "./HomeFooter";

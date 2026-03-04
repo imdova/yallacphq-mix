@@ -1,0 +1,139 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UsePipes,
+  Version,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Role as AppRole } from '../../common/auth/role';
+import { Roles } from '../../common/auth/roles.decorator';
+import { RolesGuard } from '../../common/auth/roles.guard';
+import { ResponseSchema } from '../../common/decorators/response-schema.decorator';
+import { ApiAuth } from '../../common/swagger/decorators/api-auth.decorator';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  adminDeleteOrderResponseSchema,
+  createOrderBodySchema,
+  listOrdersResponseSchema,
+  orderNullableResponseSchema,
+  orderResponseSchema,
+  updateOrderBodySchema,
+} from '../../contracts';
+import type { CreateOrderBody, UpdateOrderBody } from '../../contracts';
+import { ApiOkDto, ListOrdersResponseDto } from '../../contracts/dtos';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { toApiOrder } from './order.mapper';
+import { OrdersService } from './orders.service';
+
+@ApiTags('admin')
+@Controller('admin/orders')
+export class AdminOrdersController {
+  constructor(private readonly orders: OrdersService) {}
+
+  @Get()
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ResponseSchema(listOrdersResponseSchema)
+  @ApiOperation({ summary: 'Admin: list orders' })
+  @ApiAuth()
+  @ApiOkResponse({ type: ListOrdersResponseDto })
+  async list() {
+    const items = await this.orders.listAll();
+    return { items: items.map(toApiOrder) };
+  }
+
+  @Post()
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UsePipes(new ZodValidationPipe(createOrderBodySchema))
+  @ResponseSchema(orderResponseSchema)
+  @ApiOperation({ summary: 'Admin: create order' })
+  @ApiAuth()
+  @ApiBody({
+    schema: {
+      example: {
+        studentName: 'Jane',
+        studentEmail: 'jane@example.com',
+        courseTitle: 'CPHQ',
+        amount: 299,
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    schema: {
+      example: {
+        order: {
+          id: '...',
+          studentName: 'Jane',
+          studentEmail: 'jane@example.com',
+          courseTitle: 'CPHQ',
+          currency: 'usd',
+          amount: 299,
+          provider: 'manual',
+          status: 'pending',
+          createdAt: '...',
+          updatedAt: '...',
+        },
+      },
+    },
+  })
+  async create(@Body() body: CreateOrderBody) {
+    const created = await this.orders.createFromContract(body);
+    return { order: toApiOrder(created) };
+  }
+
+  @Get(':id')
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ResponseSchema(orderNullableResponseSchema)
+  @ApiOperation({ summary: 'Admin: get order by id' })
+  @ApiAuth()
+  async getById(@Param('id') id: string) {
+    const order = await this.orders.findById(id);
+    return { order: order ? toApiOrder(order) : null };
+  }
+
+  @Patch(':id')
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UsePipes(new ZodValidationPipe(updateOrderBodySchema))
+  @ResponseSchema(orderResponseSchema)
+  @ApiOperation({ summary: 'Admin: update order' })
+  @ApiAuth()
+  async update(@Param('id') id: string, @Body() body: UpdateOrderBody) {
+    const updated = await this.orders.updateById(id, body);
+    if (!updated) throw new NotFoundException('Order not found');
+    return { order: toApiOrder(updated) };
+  }
+
+  @Delete(':id')
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ResponseSchema(adminDeleteOrderResponseSchema)
+  @ApiOperation({ summary: 'Admin: delete order' })
+  @ApiAuth()
+  @ApiOkResponse({ type: ApiOkDto })
+  async remove(@Param('id') id: string) {
+    const deleted = await this.orders.deleteById(id);
+    if (!deleted) throw new NotFoundException('Order not found');
+    return { ok: true };
+  }
+}

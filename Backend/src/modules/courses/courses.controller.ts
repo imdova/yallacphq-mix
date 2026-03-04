@@ -1,0 +1,101 @@
+import {
+  Body,
+  Controller,
+  Get,
+  ForbiddenException,
+  NotFoundException,
+  Param,
+  Post,
+  UseGuards,
+  UsePipes,
+  Version,
+} from '@nestjs/common';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { RequestUser } from '../../common/auth/current-user.decorator';
+import { Role } from '../../common/auth/role';
+import { ResponseSchema } from '../../common/decorators/response-schema.decorator';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+} from '@nestjs/swagger';
+import { ApiAuth } from '../../common/swagger/decorators/api-auth.decorator';
+import { ApiCourseEndpoints } from '../../common/swagger/decorators/api-course-endpoints.decorator';
+import { PublicCoursesResponseDto } from '../../contracts/dtos';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  enrollCourseBodySchema,
+  enrollCourseResponseSchema,
+  publicCourseResponseSchema,
+  publicCoursesResponseSchema,
+} from '../../contracts';
+import type { EnrollCourseBody } from '../../contracts';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CoursesService } from './courses.service';
+import { toApiCourse } from './course.mapper';
+import { UsersService } from '../users/users.service';
+
+@ApiCourseEndpoints()
+@Controller('courses')
+export class CoursesController {
+  constructor(
+    private readonly courses: CoursesService,
+    private readonly users: UsersService,
+  ) {}
+
+  @Get()
+  @Version('1')
+  @ResponseSchema(publicCoursesResponseSchema)
+  @ApiOperation({ summary: 'List public courses' })
+  @ApiOkResponse({ type: PublicCoursesResponseDto })
+  async listPublished() {
+    const items = await this.courses.listPublished();
+    return { items: items.map(toApiCourse) };
+  }
+
+  @Get(':id')
+  @Version('1')
+  @ResponseSchema(publicCourseResponseSchema)
+  @ApiOperation({ summary: 'Get public course by id' })
+  @ApiParam({ name: 'id', example: '65f3c77b0f6d1b5a3d1d9a10' })
+  async getPublicById(@Param('id') id: string) {
+    const course = await this.courses.findById(id);
+    if (!course) throw new NotFoundException('Course not found');
+    return { course: toApiCourse(course) };
+  }
+
+  @Post(':id/enroll')
+  @Version('1')
+  @UseGuards(JwtAuthGuard)
+  @UsePipes(new ZodValidationPipe(enrollCourseBodySchema))
+  @ResponseSchema(enrollCourseResponseSchema)
+  @ApiOperation({ summary: 'Enroll in course' })
+  @ApiAuth()
+  @ApiParam({ name: 'id', example: '65f3c77b0f6d1b5a3d1d9a10' })
+  @ApiBody({ schema: { example: {} } })
+  async enroll(
+    @Param('id') courseId: string,
+    @Body() body: EnrollCourseBody,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const course = await this.courses.findById(courseId);
+    if (!course) throw new NotFoundException('Course not found');
+
+    const targetUserId = body.userId ?? user.sub;
+    if (targetUserId !== user.sub && user.role !== Role.admin) {
+      throw new ForbiddenException('Cannot enroll another user');
+    }
+
+    await this.users.setEnrolled(targetUserId, true);
+    const updatedCourse = await this.courses.incrementEnrolledCount(
+      courseId,
+      1,
+    );
+
+    return {
+      ok: true,
+      enrolledCount: updatedCourse?.enrolledCount,
+    };
+  }
+}

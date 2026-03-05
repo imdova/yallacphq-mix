@@ -54,6 +54,24 @@ export class CoursesController {
     return { items: items.map(toApiCourse) };
   }
 
+  @Get('mine')
+  @Version('1')
+  @UseGuards(JwtAuthGuard)
+  @ResponseSchema(publicCoursesResponseSchema)
+  @ApiOperation({ summary: 'List my enrolled courses' })
+  @ApiAuth()
+  @ApiOkResponse({ type: PublicCoursesResponseDto })
+  async getMyCourses(@CurrentUser() user: RequestUser) {
+    const courseIds = await this.users.getEnrolledCourseIds(user.sub);
+    const courses = await Promise.all(
+      courseIds.map((id) => this.courses.findById(id)),
+    );
+    const items = courses
+      .filter((c): c is NonNullable<typeof c> => c != null)
+      .map(toApiCourse);
+    return { items };
+  }
+
   @Get(':id')
   @Version('1')
   @ResponseSchema(publicCourseResponseSchema)
@@ -87,11 +105,12 @@ export class CoursesController {
       throw new ForbiddenException('Cannot enroll another user');
     }
 
-    await this.users.setEnrolled(targetUserId, true);
-    const updatedCourse = await this.courses.incrementEnrolledCount(
-      courseId,
-      1,
-    );
+    const newlyAdded = await this.users.addEnrolledCourse(targetUserId, courseId);
+    if (newlyAdded) {
+      await this.courses.incrementEnrolledCount(courseId, 1);
+    }
+
+    const updatedCourse = await this.courses.findById(courseId);
 
     return {
       ok: true,

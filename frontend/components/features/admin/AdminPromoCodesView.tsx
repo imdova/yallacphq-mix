@@ -361,8 +361,8 @@ export function AdminPromoCodesView() {
 
       <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
         <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-3 sm:grid-cols-[1fr_160px_160px_180px_180px_auto] sm:items-end">
-            <div className="space-y-1">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_140px_140px_140px_140px_auto] sm:items-end">
+            <div className="space-y-1 sm:col-span-2 lg:col-span-1">
               <div className="text-xs font-semibold text-zinc-600">Search</div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden />
@@ -433,7 +433,7 @@ export function AdminPromoCodesView() {
 
             <Button
               asChild
-              className="h-10 w-full rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 sm:w-auto"
+              className="h-10 w-full rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 sm:w-auto lg:min-w-[140px]"
             >
               <Link href="/admin/promo-codes/new" className="inline-flex items-center gap-2">
                 <Plus className="h-4 w-4" />
@@ -473,14 +473,148 @@ export function AdminPromoCodesView() {
             </div>
           ) : (
             <>
-              <DataTable
-                columns={columns}
-                data={filtered}
-                pageSize={10}
-                enableRowSelection={false}
-                emptyMessage="No promo codes found."
-                className="[&_.rounded-md.border]:rounded-2xl [&_.rounded-md.border]:border-zinc-200 [&_thead]:bg-zinc-50/70"
-              />
+              {/* Narrow viewport: card list */}
+              <div className="block xl:hidden space-y-3">
+                {filtered.map((p) => {
+                  const maxUsage = p.maxUsageEnabled && p.maxUsage != null ? p.maxUsage : null;
+                  const pct =
+                    maxUsage && maxUsage > 0
+                      ? Math.min(100, Math.round((p.usageCount / maxUsage) * 100))
+                      : null;
+                  return (
+                    <Card
+                      key={p.id}
+                      className="rounded-2xl border-zinc-200 bg-white shadow-sm overflow-hidden"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono font-semibold text-zinc-900">{p.code}</span>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8 shrink-0 rounded-xl border-zinc-200"
+                                onClick={() => void copyText(p.code)}
+                                aria-label="Copy promo code"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold",
+                                  p.active
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-zinc-200 bg-zinc-100 text-zinc-700"
+                                )}
+                              >
+                                {p.active ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold capitalize",
+                                  p.discountType === "percentage"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                )}
+                              >
+                                {p.discountType}
+                              </span>
+                              <span className="font-semibold text-zinc-900">{formatDiscount(p)}</span>
+                              <span className="text-zinc-500">
+                                {p.restrictToProductEnabled
+                                  ? `Restricted · ${p.productId ?? "—"}`
+                                  : "Sitewide"}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                              <span>
+                                {maxUsage != null ? `Max ${maxUsage}` : "Unlimited"} ·{" "}
+                                {p.perCustomerLimit != null
+                                  ? `Per customer ${p.perCustomerLimit}`
+                                  : "No per-customer limit"}
+                              </span>
+                            </div>
+                            {maxUsage != null ? (
+                              <div className="space-y-1">
+                                <div className="text-xs font-medium text-zinc-700">
+                                  Usage: {p.usageCount}/{maxUsage}
+                                </div>
+                                <div className="h-2 w-full max-w-32 overflow-hidden rounded-full bg-zinc-200">
+                                  <div
+                                    className="h-full bg-gold"
+                                    style={{ width: `${pct ?? 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-zinc-500">Usage: {p.usageCount}</div>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-9 rounded-xl border-zinc-200"
+                              onClick={() => void toggleActive(p)}
+                              disabled={togglingId === p.id}
+                              aria-label={p.active ? "Deactivate" : "Activate"}
+                            >
+                              {p.active ? (
+                                <ToggleRight className="h-4 w-4" />
+                              ) : (
+                                <ToggleLeft className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="h-9 rounded-xl border-zinc-200"
+                              aria-label="Edit"
+                            >
+                              <Link href={`/admin/promo-codes/new?edit=${p.id}`}>
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-9 rounded-xl border-zinc-200 text-red-600 hover:text-red-700"
+                              onClick={() => {
+                                setDeleting(p);
+                                setDeleteOpen(true);
+                              }}
+                              aria-label="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Wide viewport: table */}
+              <div className="hidden xl:block overflow-x-auto -mx-4 sm:mx-0">
+                <div className="min-w-[900px] px-4 sm:px-0">
+                  <DataTable
+                    columns={columns}
+                    data={filtered}
+                    pageSize={10}
+                    enableRowSelection={false}
+                    emptyMessage="No promo codes found."
+                    className="[&_.rounded-md.border]:rounded-2xl [&_.rounded-md.border]:border-zinc-200 [&_thead]:bg-zinc-50/70"
+                  />
+                </div>
+              </div>
             </>
           )}
         </CardContent>

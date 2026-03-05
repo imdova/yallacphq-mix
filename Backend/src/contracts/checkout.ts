@@ -11,6 +11,8 @@ export const createPaymentSessionBodySchema = z.object({
   discountAmount: z.number().optional(),
   promoCode: z.string().optional(),
   idempotencyKey: z.string().min(8).optional(),
+  /** Course IDs to enroll the user in after payment (cart checkout). */
+  courseIds: z.array(z.string().min(1)).optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<

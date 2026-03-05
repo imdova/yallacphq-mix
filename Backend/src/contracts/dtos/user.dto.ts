@@ -75,3 +75,30 @@ export class CreateUserBodyDto {
   @ApiProperty({ required: false, example: false })
   enrolled?: boolean;
 }
+
+/** PATCH body: all fields optional */
+export class AdminUpdateUserBodyDto {
+  @ApiProperty({ required: false, example: 'Henry Walker', minLength: 1 })
+  name?: string;
+
+  @ApiProperty({ required: false, example: 'student18@example.com', format: 'email' })
+  email?: string;
+
+  @ApiProperty({ required: false, enum: UserRoleDto, example: UserRoleDto.student })
+  role?: UserRoleDto;
+
+  @ApiProperty({ required: false, example: '+20 155 014 8448' })
+  phone?: string;
+
+  @ApiProperty({ required: false, example: 'CPHQ Exam Prep' })
+  course?: string;
+
+  @ApiProperty({ required: false, example: 'Egypt' })
+  country?: string;
+
+  @ApiProperty({ required: false, example: 'Quality Management' })
+  speciality?: string;
+
+  @ApiProperty({ required: false, example: false })
+  enrolled?: boolean;
+}

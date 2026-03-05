@@ -81,7 +81,8 @@ export async function POST(req: Request) {
     const user = await dbCreateUser({
       email: body.email.toLowerCase(),
       name: body.name,
-      role: "member",
+      role: "student",
+      ...(body.speciality?.trim() && { speciality: body.speciality.trim() }),
     });
 
     await setCredential(user.email, user.id, body.password);

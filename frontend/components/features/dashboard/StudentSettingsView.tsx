@@ -18,6 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api/error";
 import { getCurrentUser, updateCurrentUser } from "@/lib/dal/user";
+import { changePassword } from "@/lib/dal/auth";
+import { uploadProfileImage } from "@/lib/dal/upload";
 import { useAuth } from "@/contexts/auth-context";
 import {
   Calendar,
@@ -118,6 +120,7 @@ export function StudentSettingsView() {
   const [error, setError] = React.useState<string | null>(null);
   const [section, setSection] = React.useState<Section>("security");
   const [avatarUrl, setAvatarUrl] = React.useState<string>("");
+  const [avatarUploading, setAvatarUploading] = React.useState(false);
   const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
@@ -150,6 +153,7 @@ export function StudentSettingsView() {
           specialization: me.speciality ?? p.specialization,
           phoneNumber: (me.phone ?? "").replace(/[^\d]/g, ""),
         }));
+        if (me.profileImageUrl) setAvatarUrl(me.profileImageUrl);
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Failed to load settings"));
       } finally {
@@ -206,6 +210,40 @@ export function StudentSettingsView() {
     next: "",
     confirm: "",
   });
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = React.useState(false);
+  const [changePasswordLoading, setChangePasswordLoading] = React.useState(false);
+
+  const savePassword = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(false);
+    if (!password.current.trim()) {
+      setPasswordError("Enter your current password.");
+      return;
+    }
+    if (password.next.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (password.next !== password.confirm) {
+      setPasswordError("New password and confirmation do not match.");
+      return;
+    }
+    setChangePasswordLoading(true);
+    try {
+      await changePassword({
+        currentPassword: password.current,
+        newPassword: password.next,
+      });
+      setPassword({ current: "", next: "", confirm: "" });
+      setPasswordSuccess(true);
+      window.setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (e) {
+      setPasswordError(getErrorMessage(e, "Failed to change password. Check your current password."));
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -213,14 +251,17 @@ export function StudentSettingsView() {
     try {
       setError(null);
       const name = `${form.firstName} ${form.lastName}`.trim();
-      const phone = form.phoneNumber.trim() ? form.phoneNumber.trim() : undefined;
+      const dial = PHONE_COUNTRIES.find((c) => c.code === form.phoneCountry)?.dial ?? "";
+      const phoneRaw = form.phoneNumber.trim();
+      const phone = phoneRaw ? (dial ? `${dial}${phoneRaw}` : phoneRaw) : undefined;
       const speciality = form.specialization.trim() ? form.specialization.trim() : undefined;
       const country = form.country.trim() ? form.country.trim() : undefined;
       await updateCurrentUser({
         ...(name ? { name } : {}),
-        ...(phone ? { phone } : {}),
+        ...(phone !== undefined ? { phone } : {}),
         ...(speciality ? { speciality } : {}),
         ...(country ? { country } : {}),
+        ...(avatarUrl && avatarUrl.startsWith("http") ? { profileImageUrl: avatarUrl } : {}),
       });
       await refresh();
       setSaved(true);
@@ -348,7 +389,7 @@ export function StudentSettingsView() {
                         <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-lime-400 p-4">
                           <button
                             type="button"
-                            onClick={() => avatarInputRef.current?.click()}
+                            onClick={() => !avatarUploading && avatarInputRef.current?.click()}
                             className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-white/30 shadow-sm ring-1 ring-black/10 transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                             style={
                               avatarUrl
@@ -363,8 +404,9 @@ export function StudentSettingsView() {
                           >
                             {!avatarUrl ? (
                               <span className="text-lg font-bold text-white drop-shadow">
-                                {(form.firstName[0] ?? "A").toUpperCase()}
-                                {(form.lastName[0] ?? "A").toUpperCase()}
+                                {avatarUploading
+                                  ? "…"
+                                  : `${(form.firstName[0] ?? "A").toUpperCase()}${(form.lastName[0] ?? "A").toUpperCase()}`}
                               </span>
                             ) : (
                               <span className="sr-only">Profile picture</span>
@@ -375,14 +417,21 @@ export function StudentSettingsView() {
                             type="file"
                             accept="image/*"
                             className="sr-only"
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const next = URL.createObjectURL(file);
-                              setAvatarUrl((prev) => {
-                                if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-                                return next;
-                              });
+                              if (!file.type.startsWith("image/")) return;
+                              if (file.size > 2 * 1024 * 1024) return;
+                              setAvatarUploading(true);
+                              try {
+                                const { url } = await uploadProfileImage(file);
+                                setAvatarUrl((prev) => {
+                                  if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                                  return url;
+                                });
+                              } finally {
+                                setAvatarUploading(false);
+                              }
                             }}
                           />
                         </div>
@@ -636,6 +685,17 @@ export function StudentSettingsView() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
+                  {passwordError ? (
+                    <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                      {passwordError}
+                    </div>
+                  ) : null}
+                  {passwordSuccess ? (
+                    <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      Password changed successfully.
+                    </div>
+                  ) : null}
                   <div className="grid gap-4">
                     <Field label="Current Password">
                       <Input
@@ -644,6 +704,7 @@ export function StudentSettingsView() {
                         onChange={(e) => setPassword((p) => ({ ...p, current: e.target.value }))}
                         placeholder="Enter current password"
                         className="h-10 rounded-xl border-zinc-200 bg-white"
+                        autoComplete="current-password"
                       />
                     </Field>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -652,8 +713,9 @@ export function StudentSettingsView() {
                           type="password"
                           value={password.next}
                           onChange={(e) => setPassword((p) => ({ ...p, next: e.target.value }))}
-                          placeholder="New password"
+                          placeholder="New password (min 8 characters)"
                           className="h-10 rounded-xl border-zinc-200 bg-white"
+                          autoComplete="new-password"
                         />
                       </Field>
                       <Field label="Confirm New Password">
@@ -663,10 +725,19 @@ export function StudentSettingsView() {
                           onChange={(e) => setPassword((p) => ({ ...p, confirm: e.target.value }))}
                           placeholder="Confirm new password"
                           className="h-10 rounded-xl border-zinc-200 bg-white"
+                          autoComplete="new-password"
                         />
                       </Field>
                     </div>
                   </div>
+                  <Button
+                    type="button"
+                    className="mt-4 h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                    onClick={() => void savePassword()}
+                    disabled={changePasswordLoading}
+                  >
+                    {changePasswordLoading ? "Changing…" : "Change password"}
+                  </Button>
                 </CardContent>
               </Card>
 

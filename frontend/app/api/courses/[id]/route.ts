@@ -39,7 +39,6 @@ export async function GET(
   const course = await getCourseById(id);
   if (!course) return jsonError(404, "Not found");
   if (
-    (course.visibility ?? "public") !== "public" ||
     (course.status ?? "published") !== "published"
   ) {
     return jsonError(404, "Not found");

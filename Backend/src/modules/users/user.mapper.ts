@@ -17,6 +17,7 @@ export function toApiUser(user: UserDocument): ApiUser {
     course: user.course,
     country: user.country,
     speciality: user.speciality,
+    profileImageUrl: user.profileImageUrl,
     createdAt: user.createdAt?.toISOString?.() ?? new Date().toISOString(),
     updatedAt: user.updatedAt?.toISOString?.() ?? new Date().toISOString(),
   };

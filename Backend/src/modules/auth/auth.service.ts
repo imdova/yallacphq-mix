@@ -53,6 +53,7 @@ export class AuthService {
     name: string;
     email: string;
     password: string;
+    speciality?: string;
   }) {
     const existing = await this.users.findOne({ email: params.email });
     if (existing) {
@@ -64,6 +65,7 @@ export class AuthService {
       name: params.name,
       email: params.email,
       passwordHash,
+      speciality: params.speciality,
     });
 
     const accessToken = await this.signAccessToken(user);
@@ -111,5 +113,18 @@ export class AuthService {
     const accessToken = await this.signAccessToken(user);
     const newRefreshToken = await this.signRefreshToken(user);
     return { accessToken, refreshToken: newRefreshToken, user };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('Current password is incorrect');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await this.users.setPasswordHash(userId, passwordHash);
+    if (!updated) throw new UnauthorizedException('User not found');
+    return updated;
   }
 }

@@ -37,7 +37,10 @@ import { cn } from "@/lib/utils";
 import { createPaymentSession } from "@/lib/dal/orders";
 import { getErrorMessage } from "@/lib/api/error";
 import { useAuth } from "@/contexts/auth-context";
+import { useCart } from "@/contexts/cart-context";
 import { validatePromoCode } from "@/lib/dal/promo-codes";
+import { getPublicCourse } from "@/lib/dal/courses";
+import type { Course } from "@/types/course";
 
 const FLAG_CDN = "https://flagcdn.com";
 const COUNTRY_CODES = [
@@ -102,6 +105,9 @@ declare global {
 export function CheckoutView() {
   const router = useRouter();
   const { user, status } = useAuth();
+  const { courseIds, clearCart, refreshCart } = useCart();
+  const [cartCourses, setCartCourses] = React.useState<Course[]>([]);
+  const [cartLoading, setCartLoading] = React.useState(true);
   const [payment, setPayment] = React.useState<PaymentMethod>("bank");
   const [paypalReady, setPaypalReady] = React.useState(false);
   const [discountCode, setDiscountCode] = React.useState("");
@@ -115,6 +121,36 @@ export function CheckoutView() {
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const receiptInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (courseIds.length === 0) {
+      setCartCourses([]);
+      setCartLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setCartLoading(true);
+      const list: Course[] = [];
+      for (const id of courseIds) {
+        const c = await getPublicCourse(id);
+        if (!cancelled && c) list.push(c);
+      }
+      if (!cancelled) setCartCourses(list);
+      setCartLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [courseIds]);
+
+  const cartTotal = React.useMemo(() => {
+    return cartCourses.reduce((sum, c) => {
+      const hasSale = c.priceSale != null && c.priceSale > 0 && (c.priceRegular ?? 0) > (c.priceSale ?? 0);
+      const price = hasSale ? (c.priceSale ?? 0) : (c.priceRegular ?? 0);
+      return sum + price;
+    }, 0);
+  }, [cartCourses]);
 
   const ACCEPTED_RECEIPT_TYPES = "image/*,.pdf";
   const MAX_RECEIPT_SIZE_MB = 10;
@@ -232,10 +268,11 @@ export function CheckoutView() {
     </button>
   );
 
-  const subtotal = PRODUCT.price;
+  const subtotal = cartCourses.length > 0 ? cartTotal : PRODUCT.price;
   const upsellTotal = addUpsell ? UPSELL.price : 0;
   const preDiscountTotal = subtotal + upsellTotal;
   const total = Math.max(0, preDiscountTotal - discountAmount);
+  const useCartCheckout = cartCourses.length > 0;
 
   const applyPromo = async () => {
     const code = discountCode.trim();
@@ -266,17 +303,28 @@ export function CheckoutView() {
       router.push(`/auth/login?next=${encodeURIComponent(ROUTES.CHECKOUT)}`);
       return;
     }
+    if (useCartCheckout && cartCourses.length === 0) {
+      setCheckoutError("Your cart is empty. Add courses from the catalog.");
+      return;
+    }
     setSubmitting(true);
     try {
       await createPaymentSession({
         method: "bank",
-        courseTitle: PRODUCT.name,
+        courseTitle: useCartCheckout
+          ? `${cartCourses.length} course(s) from Yalla CPHQ`
+          : PRODUCT.name,
         currency: "USD",
         amount: total,
         discountAmount: discountAmount || undefined,
         promoCode: discountCode.trim() || undefined,
         idempotencyKey: crypto.randomUUID(),
+        ...(useCartCheckout && courseIds.length > 0 ? { courseIds } : undefined),
       });
+      if (useCartCheckout) {
+        await clearCart();
+        await refreshCart();
+      }
       router.push("/dashboard/orders");
     } catch (e) {
       setCheckoutError(getErrorMessage(e, "Failed to start checkout"));
@@ -673,13 +721,36 @@ export function CheckoutView() {
                 </span>
               </div>
               <ul className="mt-6 space-y-3">
-                <li>
-                  <p className="font-medium text-zinc-900">{PRODUCT.name}</p>
-                  <p className="text-sm text-zinc-500">{PRODUCT.subtitle}</p>
-                  <p className="mt-1 font-semibold text-zinc-900">
-                    ${PRODUCT.price.toFixed(2)}
-                  </p>
-                </li>
+                {cartLoading ? (
+                  <li className="text-sm text-zinc-500">Loading cart…</li>
+                ) : cartCourses.length > 0 ? (
+                  cartCourses.map((c) => {
+                    const hasSale =
+                      c.priceSale != null &&
+                      c.priceSale > 0 &&
+                      (c.priceRegular ?? 0) > (c.priceSale ?? 0);
+                    const price = hasSale ? c.priceSale! : (c.priceRegular ?? 0);
+                    return (
+                      <li key={c.id}>
+                        <p className="font-medium text-zinc-900">{c.title}</p>
+                        <p className="text-sm text-zinc-500">{c.instructorName}</p>
+                        <p className="mt-1 font-semibold text-zinc-900">
+                          ${typeof price === "number" ? price.toFixed(2) : "0.00"}
+                        </p>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <>
+                    <li>
+                      <p className="font-medium text-zinc-900">{PRODUCT.name}</p>
+                      <p className="text-sm text-zinc-500">{PRODUCT.subtitle}</p>
+                      <p className="mt-1 font-semibold text-zinc-900">
+                        ${PRODUCT.price.toFixed(2)}
+                      </p>
+                    </li>
+                  </>
+                )}
                 {addUpsell && (
                   <li className="flex items-start justify-between gap-2 border-t border-zinc-100 pt-3">
                     <div>

@@ -20,7 +20,6 @@ const baseCourseSchema = z.object({
   instructorTitle: z.string().min(1, "Instructor title is required").max(160),
   durationHours: z.coerce.number().min(0.5, "Duration must be at least 0.5 hours").max(1000),
   status: z.enum(["draft", "published"]).optional(),
-  visibility: z.enum(["public", "private"]).optional(),
   enableEnrollment: z.boolean().optional(),
   requireApproval: z.boolean().optional(),
   socialSharing: z.boolean().optional(),

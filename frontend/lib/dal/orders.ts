@@ -1,5 +1,6 @@
 import type { CreateOrderInput, Order, UpdateOrderInput } from "@/types/order";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import type { CreatePaymentSessionBody } from "@/lib/api/contracts/checkout";
 import {
   adminDeleteOrderResponseSchema,
   listOrdersResponseSchema,
@@ -62,7 +63,7 @@ export async function getUserOrders(): Promise<Order[]> {
 }
 
 export async function createPaymentSession(
-  data: z.infer<typeof createPaymentSessionBodySchema>
+  data: CreatePaymentSessionBody
 ) {
   return apiPost("/api/checkout/session", data, { schema: createPaymentSessionResponseSchema });
 }

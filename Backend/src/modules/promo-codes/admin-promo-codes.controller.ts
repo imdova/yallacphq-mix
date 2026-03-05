@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,10 +8,12 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
   UsePipes,
   Version,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -92,12 +95,37 @@ export class AdminPromoCodesController {
   @Version('1')
   @Roles(AppRole.admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @UsePipes(new ZodValidationPipe(updatePromoCodeBodySchema))
   @ResponseSchema(promoCodeResponseSchema)
   @ApiOperation({ summary: 'Admin: update promo code' })
   @ApiAuth()
-  async update(@Param('id') id: string, @Body() body: UpdatePromoCodeBody) {
-    const updated = await this.promo.updateById(id, body);
+  async update(@Param('id') id: string, @Req() req: Request) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = JSON.parse(rawBody) as unknown;
+      } catch {
+        throw new BadRequestException({
+          message: 'Invalid JSON body',
+          code: 'INVALID_JSON',
+        });
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: [{ message: 'Body must be a JSON object', path: [], code: 'invalid_type' }],
+      });
+    }
+    const parsed = updatePromoCodeBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const updated = await this.promo.updateById(id, parsed.data);
     if (!updated) throw new NotFoundException('Promo code not found');
     return { promo: toApiPromo(updated) };
   }

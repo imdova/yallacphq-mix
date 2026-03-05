@@ -8,14 +8,26 @@ import { CourseCard } from "@/components/features/courses/CourseCard";
 import { CoursesFooter } from "@/components/features/courses/CoursesFooter";
 import { Button } from "@/components/ui/button";
 import { getPublicCourses } from "@/lib/dal/courses";
+import { getPublicStudentFieldOptions } from "@/lib/dal/settings";
 import type { Course } from "@/types/course";
 
 const INITIAL_COUNT = 12;
 const LOAD_MORE_COUNT = 6;
 
+const FALLBACK_CATEGORIES = [
+  { id: "all", label: "All Resources" },
+  { id: "Exam Prep", label: "Exam Prep" },
+  { id: "Quality Management", label: "Quality Management" },
+  { id: "Patient Safety", label: "Patient Safety" },
+  { id: "Free Resources", label: "Free Resources" },
+];
+
 export default function CoursesPage() {
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [categoryOptions, setCategoryOptions] = React.useState<{ id: string; label: string }[]>(
+    FALLBACK_CATEGORIES
+  );
   const [search, setSearch] = React.useState("");
   const [category, setCategory] = React.useState("all");
   const [sort] = React.useState("newest");
@@ -42,6 +54,24 @@ export default function CoursesPage() {
     };
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    getPublicStudentFieldOptions()
+      .then((opts) => {
+        if (cancelled) return;
+        const list = opts.categories?.length
+          ? [{ id: "all", label: "All Resources" }, ...opts.categories.map((c) => ({ id: c, label: c }))]
+          : FALLBACK_CATEGORIES;
+        setCategoryOptions(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryOptions(FALLBACK_CATEGORIES);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filtered = React.useMemo(() => {
     let list = [...courses];
     if (search.trim()) {
@@ -54,14 +84,7 @@ export default function CoursesPage() {
       );
     }
     if (category !== "all") {
-      const map: Record<string, string> = {
-        "exam-prep": "Exam Prep",
-        "quality-management": "Quality Management",
-        "patient-safety": "Patient Safety",
-        free: "Free Resource",
-      };
-      const tag = map[category];
-      if (tag) list = list.filter((c) => c.tag === tag);
+      list = list.filter((c) => c.tag === category);
     }
     if (filters.level.length > 0) {
       list = list.filter((c) => c.level && filters.level.includes(c.level));
@@ -107,6 +130,7 @@ export default function CoursesPage() {
           onSearchChange={setSearch}
           category={category}
           onCategoryChange={setCategory}
+          categoryOptions={categoryOptions}
         />
         <div className="container px-4 py-6 sm:py-8 md:px-6">
           <div className="grid gap-6 lg:grid-cols-[260px_1fr] lg:gap-10">

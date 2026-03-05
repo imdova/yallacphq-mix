@@ -13,71 +13,58 @@ import {
   CheckCircle2,
   Sparkles,
 } from "lucide-react";
+import { getMyCourses } from "@/lib/dal/courses";
+import type { Course } from "@/types/course";
 
-const CURRENT_COURSES = [
-  {
-    id: "1",
-    title: "Healthcare Quality Strategy",
-    instructor: "Dr. Alan Grant",
-    nextLesson: "Stakeholder Alignment",
-    progress: 82,
-    image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&q=80",
-    access: "paid",
-  },
-  {
-    id: "2",
-    title: "Data Analysis for Healthcare",
-    instructor: "Dr. Alan Grant",
-    nextLesson: "Descriptive Statistics",
-    progress: 45,
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80",
-    access: "paid",
-  },
-  {
-    id: "3",
-    title: "Risk Management Protocols",
-    instructor: "Dr. Alan Grant",
-    nextLesson: "FMEA Introduction",
-    progress: 12,
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&q=80",
-    access: "paid",
-  },
-  {
-    id: "6",
-    title: "Clinical Quality Improvement",
-    instructor: "Dr. Alan Grant",
-    nextLesson: "Introduction",
-    progress: 0,
-    image: "https://images.unsplash.com/photo-1579154204342-9d7bd0a861541?w=400&q=80",
-    access: "free",
-  },
-];
+const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&q=80";
 
-const COMPLETED_COURSES = [
-  {
-    id: "4",
-    title: "Foundations of Healthcare Quality",
-    image: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=400&q=80",
-    access: "paid",
-  },
-  {
-    id: "5",
-    title: "CPHQ Terminology & Definitions",
-    image: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&q=80",
-    access: "free",
-  },
-];
+type CourseCard = {
+  id: string;
+  title: string;
+  instructor: string;
+  nextLesson: string;
+  progress: number;
+  image: string;
+  access: "free" | "paid";
+};
 
 export function MyCoursesView() {
   const [activeTab, setActiveTab] = React.useState<"all" | "free" | "paid">("all");
   const viewMode: "grid" | "list" = "grid";
+  const [courses, setCourses] = React.useState<Course[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const currentCourses = React.useMemo(() => {
-    return CURRENT_COURSES;
+  React.useEffect(() => {
+    let cancelled = false;
+    getMyCourses()
+      .then((list) => {
+        if (!cancelled) setCourses(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCourses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const completedCourses = React.useMemo(() => {
-    return COMPLETED_COURSES;
+  const currentCourses = React.useMemo((): CourseCard[] => {
+    return courses.map((c) => ({
+      id: c.id,
+      title: c.title,
+      instructor: c.instructorName ?? "Instructor",
+      nextLesson: "Continue learning",
+      progress: 0,
+      image: c.imageUrl ?? DEFAULT_IMAGE,
+      access: (c.priceSale ?? c.priceRegular ?? 0) > 0 ? "paid" : "free",
+    }));
+  }, [courses]);
+
+  const completedCourses = React.useMemo((): { id: string; title: string; image: string; access: "free" | "paid" }[] => {
+    return [];
   }, []);
 
   const filteredCurrent = React.useMemo(() => {
@@ -91,6 +78,17 @@ export function MyCoursesView() {
   }, [activeTab, completedCourses]);
 
   const totalResults = filteredCurrent.length + filteredCompleted.length;
+
+  if (loading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:gap-10">
+        <div className="min-w-0 space-y-8">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">My Courses</h1>
+          <p className="text-sm text-zinc-500">Loading your courses…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:gap-10">
@@ -241,7 +239,7 @@ function CoursesSection({
   title: string;
   icon: React.ReactNode;
   viewMode: "grid" | "list";
-  courses: typeof CURRENT_COURSES;
+  courses: CourseCard[];
   emptyHint?: string;
 }) {
   if (courses.length === 0) {
@@ -298,7 +296,7 @@ function CoursesSection({
                     size="sm"
                     className="flex-1 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                   >
-                    <Link href="/dashboard/courses/lesson">
+                    <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
                       {course.progress === 0 ? "Start" : "Continue"}
                       <ArrowRight className="h-4 w-4" />
                     </Link>
@@ -363,7 +361,7 @@ function CoursesSection({
                       size="sm"
                       className="gap-2 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                     >
-                      <Link href="/dashboard/courses/lesson">
+                      <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
                         {course.progress === 0 ? "Start" : "Continue"}
                         <ArrowRight className="h-4 w-4" />
                       </Link>
@@ -389,7 +387,7 @@ function CompletedSection({
   title: string;
   icon: React.ReactNode;
   viewMode: "grid" | "list";
-  courses: typeof COMPLETED_COURSES;
+  courses: { id: string; title: string; image: string; access: "free" | "paid" }[];
   emptyHint?: string;
 }) {
   if (courses.length === 0) {
@@ -432,7 +430,7 @@ function CompletedSection({
                     size="sm"
                     className="flex-1 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                   >
-                    <Link href="/dashboard/courses/lesson">
+                    <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
                       Review
                       <ArrowRight className="h-4 w-4" />
                     </Link>
@@ -482,7 +480,7 @@ function CompletedSection({
                       size="sm"
                       className="gap-2 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                     >
-                      <Link href="/dashboard/courses/lesson">
+                      <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
                         Review
                         <ArrowRight className="h-4 w-4" />
                       </Link>

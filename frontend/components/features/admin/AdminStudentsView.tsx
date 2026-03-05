@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,8 +17,9 @@ import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/features/admin/ConfirmDialog";
 import { EnrollStudentModal } from "@/components/features/admin/EnrollStudentModal";
 import { UserUpsertModal } from "@/components/features/admin/UserUpsertModal";
-import { fetchCourses } from "@/lib/dal/courses";
+import { fetchCourses, enrollUserInCourse } from "@/lib/dal/courses";
 import { createUser, deleteUser, getUsers, updateUser } from "@/lib/dal/user";
+import { getStudentFieldOptions } from "@/lib/dal/settings";
 import type { User } from "@/types/user";
 import type { Course } from "@/types/course";
 import { getErrorMessage } from "@/lib/api/error";
@@ -65,10 +67,13 @@ function getInitials(name: string): string {
 }
 
 export function AdminStudentsView() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [students, setStudents] = React.useState<User[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
   const [countryFilter, setCountryFilter] = React.useState<CountryFilter>("all");
   const [specialityFilter, setSpecialityFilter] = React.useState<SpecialityFilter>("all");
   const [enrollmentFilter, setEnrollmentFilter] = React.useState<EnrollmentFilter>("all");
@@ -86,6 +91,27 @@ export function AdminStudentsView() {
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = React.useState(false);
   const [enrollLoading, setEnrollLoading] = React.useState(false);
+  const [fieldOptions, setFieldOptions] = React.useState<{ countries: string[]; specialities: string[] }>({
+    countries: [],
+    specialities: [],
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getStudentFieldOptions()
+      .then((data) => {
+        if (!cancelled) setFieldOptions(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -93,7 +119,12 @@ export function AdminStudentsView() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getUsers();
+        const data = await getUsers({
+          search: debouncedSearch.trim() || undefined,
+          country: countryFilter !== "all" ? countryFilter : undefined,
+          speciality: specialityFilter !== "all" ? specialityFilter : undefined,
+          enrollment: enrollmentFilter !== "all" ? enrollmentFilter : undefined,
+        });
         if (!cancelled) setStudents(data);
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Failed to load students"));
@@ -104,7 +135,7 @@ export function AdminStudentsView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [debouncedSearch, countryFilter, specialityFilter, enrollmentFilter]);
 
   React.useEffect(() => {
     if (!enrollOpen) return;
@@ -128,54 +159,46 @@ export function AdminStudentsView() {
     setEnrollOpen(true);
   };
 
-  const handleEnroll = async (userId: string, _courseId: string, courseTitle: string) => {
+  const handleEnroll = async (userId: string, courseIds: string[]) => {
     setEnrollLoading(true);
     try {
-      const updated = await updateUser(userId, { enrolled: true, course: courseTitle });
-      if (updated) {
-        setStudents((prev) => prev.map((u) => (u.id === userId ? updated : u)));
-        setEnrollOpen(false);
-        setEnrollingUser(null);
+      let lastUser: User | null = null;
+      for (const courseId of courseIds) {
+        const result = await enrollUserInCourse(courseId, userId);
+        if (result.user) lastUser = result.user as User;
       }
+      if (lastUser) {
+        setStudents((prev) => prev.map((u) => (u.id === userId ? lastUser! : u)));
+      } else if (courseIds.length > 0) {
+        const updated = await updateUser(userId, { enrolled: true });
+        if (updated) setStudents((prev) => prev.map((u) => (u.id === userId ? updated : u)));
+      }
+      setEnrollOpen(false);
+      setEnrollingUser(null);
     } finally {
       setEnrollLoading(false);
     }
   };
 
   const countryOptions = React.useMemo(() => {
+    if (fieldOptions.countries.length > 0) return fieldOptions.countries;
     const set = new Set<string>();
     students.forEach((u) => {
       const c = u.country?.trim();
       if (c) set.add(c);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [students]);
+  }, [students, fieldOptions.countries]);
 
   const specialityOptions = React.useMemo(() => {
+    if (fieldOptions.specialities.length > 0) return fieldOptions.specialities;
     const set = new Set<string>();
     students.forEach((u) => {
       const s = u.speciality?.trim();
       if (s) set.add(s);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [students]);
-
-  const filtered = React.useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return students.filter((u) => {
-      if (q) {
-        const name = (u.name ?? "").toLowerCase();
-        const email = (u.email ?? "").toLowerCase();
-        const phone = (u.phone ?? "").toLowerCase();
-        if (!name.includes(q) && !email.includes(q) && !phone.includes(q)) return false;
-      }
-      if (countryFilter !== "all" && (u.country?.trim() || "") !== countryFilter) return false;
-      if (specialityFilter !== "all" && (u.speciality?.trim() || "") !== specialityFilter) return false;
-      if (enrollmentFilter === "enrolled" && !u.enrolled) return false;
-      if (enrollmentFilter === "not_enrolled" && u.enrolled) return false;
-      return true;
-    });
-  }, [students, searchQuery, countryFilter, specialityFilter, enrollmentFilter]);
+  }, [students, fieldOptions.specialities]);
 
   const stats = React.useMemo(() => {
     const total = students.length;
@@ -191,6 +214,15 @@ export function AdminStudentsView() {
     setEditing(null);
     setModalOpen(true);
   };
+
+  // Quick add from navbar: /admin/students?add=1 opens create modal
+  React.useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      openCreate();
+      router.replace("/admin/students", { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount / when add=1
+  }, []);
 
   const handleUpsert = async (data: {
     name: string;
@@ -532,7 +564,7 @@ export function AdminStudentsView() {
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
               <p className="mt-3 text-sm font-medium text-zinc-600">Loading students…</p>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : students.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50/50 py-16 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-200/80 text-zinc-500">
                 <Users className="h-7 w-7" />
@@ -570,7 +602,7 @@ export function AdminStudentsView() {
             <>
               {/* Narrow viewport: card list — no horizontal scroll */}
               <div className="block xl:hidden space-y-3">
-                {filtered.map((u) => (
+                {students.map((u) => (
                   <Card
                     key={u.id}
                     className="rounded-2xl border-zinc-200 bg-white shadow-sm overflow-hidden"
@@ -679,7 +711,7 @@ export function AdminStudentsView() {
                 <div className="min-w-[800px] px-4 sm:px-0">
                   <DataTable
                     columns={columns}
-                    data={filtered}
+                    data={students}
                     pageSize={10}
                     enableRowSelection={false}
                     emptyMessage="No students found."
@@ -696,6 +728,8 @@ export function AdminStudentsView() {
         open={modalOpen}
         mode={mode}
         user={editing}
+        countryOptions={fieldOptions.countries}
+        specialityOptions={fieldOptions.specialities}
         onOpenChange={setModalOpen}
         onSubmit={handleUpsert}
       />

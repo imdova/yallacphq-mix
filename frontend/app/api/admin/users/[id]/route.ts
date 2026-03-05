@@ -78,7 +78,18 @@ export async function PATCH(
         });
       }
       const parsed = adminUpdateUserBodySchema.parse(bodyObj);
-      // Parsed body has empty strings coerced to undefined; JSON.stringify omits undefined
+      // Build plain object and send as JSON string (avoid any non-string serialization)
+      const payload: Record<string, unknown> = {};
+      if (parsed.name !== undefined) payload.name = parsed.name;
+      if (parsed.email !== undefined) payload.email = parsed.email;
+      if (parsed.role !== undefined) payload.role = parsed.role;
+      if (parsed.phone !== undefined) payload.phone = parsed.phone;
+      if (parsed.course !== undefined) payload.course = parsed.course;
+      if (parsed.country !== undefined) payload.country = parsed.country;
+      if (parsed.speciality !== undefined) payload.speciality = parsed.speciality;
+      if (parsed.enrolled !== undefined) payload.enrolled = parsed.enrolled;
+
+      const bodyString = JSON.stringify(payload);
       const res = await fetch(`${backendUrl}${BACKEND_API_PREFIX}/admin/users/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: {
@@ -86,7 +97,7 @@ export async function PATCH(
           cookie: cookieHeader,
           "x-request-id": requestId,
         },
-        body: JSON.stringify(parsed),
+        body: bodyString,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

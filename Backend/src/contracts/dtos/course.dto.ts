@@ -5,11 +5,6 @@ export enum CourseStatusDto {
   published = 'published',
 }
 
-export enum CourseVisibilityDto {
-  public = 'public',
-  private = 'private',
-}
-
 export class ApiCourseDto {
   @ApiProperty({ example: '65f3c77b0f6d1b5a3d1d9a10' })
   id!: string;
@@ -60,13 +55,6 @@ export class ApiCourseDto {
   })
   status?: CourseStatusDto;
 
-  @ApiProperty({
-    required: false,
-    enum: CourseVisibilityDto,
-    example: CourseVisibilityDto.public,
-  })
-  visibility?: CourseVisibilityDto;
-
   @ApiProperty({ required: false, example: true })
   enableEnrollment?: boolean;
 
@@ -104,9 +92,6 @@ export class CreateCourseBodyDto {
 
   @ApiProperty({ required: false, enum: CourseStatusDto, example: 'draft', description: 'draft or published' })
   status?: CourseStatusDto;
-
-  @ApiProperty({ required: false, enum: CourseVisibilityDto, example: 'public', description: 'public or private' })
-  visibility?: CourseVisibilityDto;
 
   @ApiProperty({ required: false, example: 'A complete course to prepare for the CPHQ exam...', description: 'Course description' })
   description?: string;

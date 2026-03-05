@@ -22,6 +22,12 @@ export const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),
+
+  // AWS S3 (optional – required only for image uploads)
+  AWS_REGION: z.string().optional(),
+  AWS_ACCESS_KEY: z.string().optional(),
+  AWS_SECRET_KEY: z.string().optional(),
+  AWS_BUCKET_NAME: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -4,10 +4,11 @@ import {
   createPaymentSessionBodySchema,
   createPaymentSessionResponseSchema,
 } from "@/lib/api/contracts/checkout";
+import { getBackendUrl, isBackendConfigured, BACKEND_API_PREFIX } from "@/lib/api/backend-url";
+import { getRequestIdFromRequest, newRequestId } from "@/lib/api/request-id";
 import { requireSession } from "@/lib/auth/server";
 import { getUserById } from "@/lib/db/users";
 import { createOrder, fetchOrderById } from "@/lib/db/orders";
-import { getRequestIdFromRequest, newRequestId } from "@/lib/api/request-id";
 
 type SessionRecord = {
   sessionId: string;
@@ -29,6 +30,46 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const requestId = getRequestIdFromRequest(req) ?? newRequestId();
+
+  if (isBackendConfigured()) {
+    const cookieHeader = req.headers.get("cookie") ?? "";
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonError(400, "Invalid JSON", { requestId });
+    }
+    const parsed = createPaymentSessionBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(400, "Invalid request", { issues: zodIssues(parsed.error), requestId });
+    }
+    try {
+      const res = await fetch(`${getBackendUrl()}${BACKEND_API_PREFIX}/checkout/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: cookieHeader,
+          "x-request-id": requestId,
+        },
+        body: JSON.stringify(parsed.data),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return jsonError(
+          res.status === 401 ? 401 : 400,
+          (data?.message as string) ?? "Checkout failed",
+          { requestId }
+        );
+      }
+      const out = createPaymentSessionResponseSchema.safeParse(data);
+      if (!out.success) return jsonError(500, "Invalid response", { requestId });
+      return jsonOk(out.data, { status: res.status === 201 ? 201 : 200, requestId });
+    } catch (e) {
+      console.error("[checkout/session]", { requestId, error: e });
+      return jsonError(500, "Checkout failed", { requestId });
+    }
+  }
+
   try {
     const session = await requireSession();
     const user = await getUserById(session.uid);

@@ -5,6 +5,7 @@ export const signupBodySchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
+  speciality: z.string().min(1, 'Please select your specialty'),
 });
 
 export type SignupBody = z.infer<typeof signupBodySchema>;
@@ -69,3 +70,16 @@ export const resetPasswordResponseSchema = z.object({
 });
 
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
+
+export const changePasswordBodySchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;
+
+export const changePasswordResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
+export type ChangePasswordResponse = z.infer<typeof changePasswordResponseSchema>;

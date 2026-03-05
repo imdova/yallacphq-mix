@@ -18,7 +18,6 @@ export function toApiCourse(course: CourseDocument): ApiCourse {
     enrolledCount: course.enrolledCount,
     lessons: course.lessons,
     status: course.status,
-    visibility: course.visibility,
     enableEnrollment: course.enableEnrollment,
     requireApproval: course.requireApproval,
     socialSharing: course.socialSharing,

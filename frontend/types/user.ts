@@ -8,6 +8,7 @@ export interface User {
   course?: string;
   country?: string;
   speciality?: string;
+  profileImageUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -19,6 +19,8 @@ export type CreatePendingOrderParams = {
   discountAmount?: number;
   promoCode?: string;
   provider: PaymentProvider;
+  userId?: string;
+  courseIds?: string[];
 };
 
 @Injectable()

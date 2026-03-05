@@ -10,11 +10,14 @@ import { DatabaseModule } from './database/database.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CartModule } from './modules/cart/cart.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PromoCodesModule } from './modules/promo-codes/promo-codes.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { UploadModule } from './modules/upload/upload.module';
 import { UsersModule } from './modules/users/users.module';
 import { randomUUID } from 'crypto';
 
@@ -90,11 +93,14 @@ function getReqBasics(req: unknown): { method?: string; url?: string } {
     DatabaseModule,
     AuthModule,
     UsersModule,
+    CartModule,
     CoursesModule,
     OrdersModule,
     PaymentsModule,
     PromoCodesModule,
     LeadsModule,
+    SettingsModule,
+    UploadModule,
     AdminModule,
   ],
   controllers: [AppController],

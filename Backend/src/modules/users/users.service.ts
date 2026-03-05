@@ -5,6 +5,10 @@ import { Role } from '../../common/auth/role';
 import { User, UserDocument } from './schemas/user.schema';
 import type { UpdateCurrentUserBody } from '../../contracts';
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -15,12 +19,14 @@ export class UsersService {
     name: string;
     email: string;
     passwordHash: string;
+    speciality?: string;
   }) {
     return this.userModel.create({
       name: params.name,
       email: params.email,
       passwordHash: params.passwordHash,
       role: Role.student,
+      ...(params.speciality != null && params.speciality.trim() !== '' && { speciality: params.speciality.trim() }),
     });
   }
 
@@ -50,6 +56,40 @@ export class UsersService {
     return this.userModel.find().sort({ createdAt: -1 }).exec();
   }
 
+  /**
+   * List users with optional search (name, email, phone) and filters (country, speciality, enrollment).
+   */
+  async listWithFilters(params: {
+    search?: string;
+    country?: string;
+    speciality?: string;
+    enrollment?: 'all' | 'enrolled' | 'not_enrolled';
+  }) {
+    const and: Record<string, unknown>[] = [];
+    const search = params.search?.trim();
+    if (search) {
+      const re = new RegExp(escapeRegex(search), 'i');
+      and.push({ $or: [{ name: re }, { email: re }, { phone: re }] });
+    }
+    if (params.country?.trim()) {
+      and.push({
+        country: { $regex: new RegExp(`^${escapeRegex(params.country.trim())}$`, 'i') },
+      });
+    }
+    if (params.speciality?.trim()) {
+      and.push({
+        speciality: { $regex: new RegExp(`^${escapeRegex(params.speciality.trim())}$`, 'i') },
+      });
+    }
+    if (params.enrollment === 'enrolled') {
+      and.push({ enrolled: true });
+    } else if (params.enrollment === 'not_enrolled') {
+      and.push({ enrolled: { $ne: true } });
+    }
+    const query = and.length > 0 ? { $and: and } : {};
+    return this.userModel.find(query).sort({ createdAt: -1 }).exec();
+  }
+
   async updateCurrentUser(userId: string, patch: UpdateCurrentUserBody) {
     if (!Types.ObjectId.isValid(userId)) return null;
     const update: Partial<User> = {};
@@ -59,6 +99,8 @@ export class UsersService {
     if (typeof patch.country === 'string') update.country = patch.country;
     if (typeof patch.speciality === 'string')
       update.speciality = patch.speciality;
+    if (patch.profileImageUrl !== undefined)
+      update.profileImageUrl = patch.profileImageUrl ?? undefined;
 
     return this.userModel
       .findByIdAndUpdate(userId, { $set: update }, { new: true })
@@ -70,6 +112,30 @@ export class UsersService {
     return this.userModel
       .findByIdAndUpdate(userId, { $set: { enrolled } }, { new: true })
       .exec();
+  }
+
+  /** Add a course to the user's enrolled list (idempotent). Returns true if newly added. */
+  async addEnrolledCourse(userId: string, courseId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(courseId))
+      return false;
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) return false;
+    const ids = user.enrolledCourseIds ?? [];
+    if (ids.some((id) => String(id) === String(courseId))) return false;
+    await this.userModel
+      .findByIdAndUpdate(userId, {
+        $set: { enrolled: true },
+        $addToSet: { enrolledCourseIds: courseId },
+      })
+      .exec();
+    return true;
+  }
+
+  async getEnrolledCourseIds(userId: string): Promise<string[]> {
+    if (!Types.ObjectId.isValid(userId)) return [];
+    const user = await this.userModel.findById(userId).select('enrolledCourseIds').exec();
+    if (!user?.enrolledCourseIds?.length) return [];
+    return user.enrolledCourseIds.map((id) => String(id));
   }
 
   async createFromAdmin(params: {
@@ -92,6 +158,13 @@ export class UsersService {
     if (!Types.ObjectId.isValid(userId)) return null;
     return this.userModel
       .findByIdAndUpdate(userId, { $set: patch }, { new: true })
+      .exec();
+  }
+
+  async setPasswordHash(userId: string, passwordHash: string) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel
+      .findByIdAndUpdate(userId, { $set: { passwordHash } }, { new: true })
       .exec();
   }
 

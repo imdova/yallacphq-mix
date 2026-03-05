@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Star, Clock, Users, ShoppingCart, BookOpen } from "lucide-react";
+import { Star, Clock, Users, ShoppingCart, BookOpen, Check } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TAG_STYLES } from "@/constants/courses";
 import { ROUTES } from "@/constants";
 import type { Course } from "@/types/course";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/contexts/cart-context";
+import { useAuth } from "@/contexts/auth-context";
 
 function formatPrice(value: number): string {
   if (value === 0) return "Free";
@@ -13,8 +15,11 @@ function formatPrice(value: number): string {
 }
 
 export function CourseCard({ course }: { course: Course }) {
-  const tagStyle = TAG_STYLES[course.tag] ?? "bg-zinc-600 text-white";
+  const { addToCart, isInCart } = useCart();
+  const { status } = useAuth();
+  const inCart = isInCart(course.id);
   const detailsHref = `${ROUTES.COURSE_DETAILS}?course=${encodeURIComponent(course.id)}`;
+  const tagStyle = TAG_STYLES[course.tag] ?? "bg-zinc-600 text-white";
   const hasSale = course.priceSale != null && course.priceSale > 0 && (course.priceRegular ?? 0) > (course.priceSale ?? 0);
   const displayPrice = hasSale ? course.priceSale! : (course.priceRegular ?? 0);
   const lessonsCount = course.lessons ?? Math.max(1, Math.round(course.durationHours * 4));
@@ -101,15 +106,46 @@ export function CourseCard({ course }: { course: Course }) {
           >
             <Link href={detailsHref}>View Details</Link>
           </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-9 w-9 shrink-0 rounded-xl border-zinc-200 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-            aria-label="Add to cart"
-          >
-            <ShoppingCart className="h-4 w-4" />
-          </Button>
+          {status === "authenticated" ? (
+            inCart ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-9 w-9 shrink-0 rounded-xl border-emerald-300 bg-emerald-50 text-emerald-700"
+                aria-label="In cart"
+                asChild
+              >
+                <Link href="/cart">
+                  <Check className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-9 w-9 shrink-0 rounded-xl border-zinc-200 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                aria-label="Add to cart"
+                onClick={() => void addToCart(course.id)}
+              >
+                <ShoppingCart className="h-4 w-4" />
+              </Button>
+            )
+          ) : (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-9 w-9 shrink-0 rounded-xl border-zinc-200 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+              aria-label="Add to cart (sign in required)"
+              asChild
+            >
+              <Link href={`/auth/login?next=${encodeURIComponent("/courses")}`}>
+                <ShoppingCart className="h-4 w-4" />
+              </Link>
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

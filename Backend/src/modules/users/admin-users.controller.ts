@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,15 +8,19 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  Req,
   UseGuards,
   UsePipes,
   Version,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import * as bcrypt from 'bcryptjs';
@@ -33,11 +38,12 @@ import {
   createUserBodySchema,
   listUsersResponseSchema,
 } from '../../contracts';
-import type { AdminUpdateUserBody, CreateUserBody } from '../../contracts';
+import type { CreateUserBody } from '../../contracts';
 import {
   ApiOkDto,
   CreateUserBodyDto,
   ListUsersResponseDto,
+  AdminUpdateUserBodyDto,
 } from '../../contracts/dtos';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { toApiUser } from './user.mapper';
@@ -56,9 +62,23 @@ export class AdminUsersController {
   @ResponseSchema(listUsersResponseSchema)
   @ApiOperation({ summary: 'Admin: list users' })
   @ApiAuth()
+  @ApiQuery({ name: 'search', required: false, description: 'Search by name, email, or phone' })
+  @ApiQuery({ name: 'country', required: false, description: 'Filter by country' })
+  @ApiQuery({ name: 'speciality', required: false, description: 'Filter by speciality' })
+  @ApiQuery({ name: 'enrollment', required: false, enum: ['all', 'enrolled', 'not_enrolled'], description: 'Filter by enrollment status' })
   @ApiOkResponse({ type: ListUsersResponseDto })
-  async list() {
-    const items = await this.users.list();
+  async list(
+    @Query('search') search?: string,
+    @Query('country') country?: string,
+    @Query('speciality') speciality?: string,
+    @Query('enrollment') enrollment?: 'all' | 'enrolled' | 'not_enrolled',
+  ) {
+    const items = await this.users.listWithFilters({
+      search: search?.trim() || undefined,
+      country: country?.trim() || undefined,
+      speciality: speciality?.trim() || undefined,
+      enrollment: enrollment === 'all' || !enrollment ? undefined : enrollment,
+    });
     return { items: items.map(toApiUser) };
   }
 
@@ -119,10 +139,31 @@ export class AdminUsersController {
   @Version('1')
   @Roles(AppRole.admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @UsePipes(new ZodValidationPipe(adminUpdateUserBodySchema))
   @ResponseSchema(adminUserResponseSchema)
   @ApiOperation({ summary: 'Admin: update user' })
   @ApiAuth()
+  @ApiBody({
+    type: AdminUpdateUserBodyDto,
+    description: 'Partial user update. All fields optional.',
+    examples: {
+      full: {
+        summary: 'Update profile',
+        value: {
+          name: 'Alexander Young',
+          email: 'student20@example.com',
+          role: 'student',
+          phone: '+201550148448',
+          course: 'aaaaaaaaa',
+          country: 'Egypt',
+          speciality: 'AAAAAAAAA',
+        },
+      },
+      minimal: {
+        summary: 'Update name only',
+        value: { name: 'New Name' },
+      },
+    },
+  })
   @ApiOkResponse({
     schema: {
       example: {
@@ -137,7 +178,37 @@ export class AdminUsersController {
       },
     },
   })
-  async update(@Param('id') id: string, @Body() body: AdminUpdateUserBody) {
+  async update(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = JSON.parse(rawBody) as unknown;
+      } catch {
+        throw new BadRequestException({
+          message: 'Invalid JSON body',
+          code: 'INVALID_JSON',
+        });
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: [{ message: 'Body must be a JSON object', path: [], code: 'invalid_type' }],
+      });
+    }
+    const parsed = adminUpdateUserBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const body = parsed.data;
     const patch: Partial<User> = {};
     if (body.name !== undefined) patch.name = body.name;
     if (body.email !== undefined) patch.email = body.email;

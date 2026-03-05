@@ -3,12 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
+import type { Course } from "@/types/course";
 import { adminCourseCreateSchema } from "@/lib/validations/course";
-import { createCourse } from "@/lib/dal/courses";
+import { createCourse, fetchCourseById, updateCourse } from "@/lib/dal/courses";
+import { getStudentFieldOptions } from "@/lib/dal/settings";
+import { uploadCourseImage } from "@/lib/dal/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect } from "@/components/shared/forms";
@@ -37,20 +40,25 @@ import { Switch } from "@/components/ui/switch";
 
 type FormValues = z.infer<typeof adminCourseCreateSchema>;
 
-const TAG_OPTIONS = [
-  { value: "Exam Prep", label: "Exam Prep" },
-  { value: "Quality Management", label: "Quality Management" },
-  { value: "Patient Safety", label: "Patient Safety" },
-  { value: "Free Resource", label: "Free Resource" },
-  { value: "Data Analysis", label: "Data Analysis" },
-  { value: "Compliance", label: "Compliance" },
-  { value: "Advanced", label: "Advanced" },
-] as const;
+const FALLBACK_CATEGORIES = [
+  "Exam Prep",
+  "Quality Management",
+  "Patient Safety",
+  "Free Resource",
+  "Data Analysis",
+  "Compliance",
+  "Advanced",
+];
 
 const LEVEL_OPTIONS = [
   { value: "Beginner", label: "Beginner" },
   { value: "Intermediate", label: "Intermediate" },
   { value: "Advanced", label: "Advanced" },
+] as const;
+
+const STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
+  { value: "published", label: "Published" },
 ] as const;
 
 const AVAILABILITY_OPTIONS = [
@@ -94,19 +102,72 @@ export interface CurriculumSection {
   items: CurriculumItem[];
 }
 
+function courseToFormValues(course: Course): FormValues {
+  return {
+    title: course.title,
+    tag: course.tag,
+    status: course.status ?? "draft",
+    description: course.description ?? "",
+    whoCanAttend: course.whoCanAttend ?? "",
+    whyYalla: course.whyYalla ?? "",
+    includes: course.includes ?? "",
+    imageUrl: course.imageUrl ?? "",
+    instructorImageUrl: course.instructorImageUrl ?? "",
+    videoPreviewUrl: course.videoPreviewUrl ?? "",
+    instructorName: course.instructorName,
+    instructorTitle: course.instructorTitle,
+    durationHours: course.durationHours,
+    priceRegular: course.priceRegular,
+    priceSale: course.priceSale,
+    availability: course.availability ?? "permanent",
+    enablePromoCode: course.enablePromoCode ?? true,
+    currency: course.currency ?? "USD",
+    discountPercent: course.discountPercent ?? 0,
+    level: course.level ?? "Intermediate",
+    enrolledCount: course.enrolledCount ?? 0,
+    lessons: course.lessons ?? 0,
+    seoTitle: course.seoTitle ?? "",
+    seoDescription: course.seoDescription ?? "",
+    seoKeywords: course.seoKeywords ?? "",
+    enableEnrollment: course.enableEnrollment ?? true,
+    requireApproval: course.requireApproval ?? false,
+    socialSharing: course.socialSharing ?? false,
+    certificationType: course.certificationType,
+    imagePlaceholder: course.imagePlaceholder ?? "",
+  };
+}
+
 export default function AdminCourseNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = React.useMemo(() => searchParams.get("edit"), [searchParams]);
+  const [loadingEdit, setLoadingEdit] = React.useState(!!editId);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const profileFileRef = React.useRef<HTMLInputElement | null>(null);
   const materialFileRef = React.useRef<HTMLInputElement | null>(null);
   const [coverError, setCoverError] = React.useState("");
   const [profileError, setProfileError] = React.useState("");
+  const [coverUploading, setCoverUploading] = React.useState(false);
+  const [profileUploading, setProfileUploading] = React.useState(false);
   const [step, setStep] = React.useState(1);
+  const [categoryOptions, setCategoryOptions] = React.useState<string[]>(FALLBACK_CATEGORIES);
   const [curriculumSections, setCurriculumSections] = React.useState<CurriculumSection[]>([]);
   const [expandedSectionId, setExpandedSectionId] = React.useState<string | null>(null);
   const [expandedLectureIds, setExpandedLectureIds] = React.useState<Set<string>>(new Set());
   const [materialUploadForLectureId, setMaterialUploadForLectureId] = React.useState<string | null>(null);
   const [seoKeywordInput, setSeoKeywordInput] = React.useState("");
+
+  React.useEffect(() => {
+    getStudentFieldOptions()
+      .then((opts) => {
+        const list = opts.categories?.length ? opts.categories : FALLBACK_CATEGORIES;
+        setCategoryOptions(list);
+      })
+      .catch(() => setCategoryOptions(FALLBACK_CATEGORIES));
+  }, []);
+
   const STEPS = [
     { id: 1, label: "Course details" },
     { id: 2, label: "Curriculum" },
@@ -117,6 +178,7 @@ export default function AdminCourseNewPage() {
     defaultValues: {
       title: "",
       tag: "Exam Prep",
+      status: "draft",
       description: "",
       whoCanAttend: "",
       whyYalla: "",
@@ -142,7 +204,36 @@ export default function AdminCourseNewPage() {
     },
     mode: "onSubmit",
   });
+  const isFreeCourse = (methods.watch("priceRegular") ?? 0) === 0 && (methods.watch("priceSale") ?? 0) === 0;
   const instructorImageUrl = methods.watch("instructorImageUrl") ?? "";
+  const currentTag = methods.watch("tag");
+  React.useEffect(() => {
+    if (categoryOptions.length > 0 && currentTag && !categoryOptions.includes(currentTag)) {
+      methods.setValue("tag", categoryOptions[0], { shouldValidate: false });
+    }
+  }, [categoryOptions, currentTag, methods]);
+
+  React.useEffect(() => {
+    if (!editId) {
+      setLoadingEdit(false);
+      setLoadError(null);
+      return;
+    }
+    setLoadError(null);
+    setLoadingEdit(true);
+    fetchCourseById(editId)
+      .then((course) => {
+        if (course) {
+          methods.reset(courseToFormValues(course));
+        } else {
+          setLoadError("Course not found.");
+        }
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : "Failed to load course.");
+      })
+      .finally(() => setLoadingEdit(false));
+  }, [editId, methods]);
 
   const setCoverFromFile = async (file: File) => {
     setCoverError("");
@@ -154,13 +245,15 @@ export default function AdminCourseNewPage() {
       setCoverError("Max file size is 5MB.");
       return;
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-    methods.setValue("imageUrl", dataUrl, { shouldDirty: true, shouldValidate: true });
+    setCoverUploading(true);
+    try {
+      const { url } = await uploadCourseImage(file);
+      methods.setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true });
+    } catch (e) {
+      setCoverError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setCoverUploading(false);
+    }
   };
 
   const syncSaleFromDiscount = React.useCallback(() => {
@@ -191,13 +284,15 @@ export default function AdminCourseNewPage() {
       setProfileError("Max file size is 2MB.");
       return;
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-    methods.setValue("instructorImageUrl", dataUrl, { shouldDirty: true, shouldValidate: true });
+    setProfileUploading(true);
+    try {
+      const { url } = await uploadCourseImage(file);
+      methods.setValue("instructorImageUrl", url, { shouldDirty: true, shouldValidate: true });
+    } catch (e) {
+      setProfileError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setProfileUploading(false);
+    }
   };
 
   const addSection = () => {
@@ -320,9 +415,10 @@ export default function AdminCourseNewPage() {
   };
 
   const submit = methods.handleSubmit(async (data) => {
-    await createCourse({
+    const payload = {
       title: data.title,
       tag: data.tag,
+      status: data.status ?? "draft",
       description: data.description,
       whoCanAttend: data.whoCanAttend,
       whyYalla: data.whyYalla,
@@ -345,27 +441,49 @@ export default function AdminCourseNewPage() {
       seoTitle: data.seoTitle?.trim() || undefined,
       seoDescription: data.seoDescription?.trim() || undefined,
       seoKeywords: data.seoKeywords?.trim() || undefined,
-    });
-    router.push("/admin/courses");
+    };
+    if (editId) {
+      await updateCourse(editId, payload);
+      router.push(`/admin/courses/${editId}`);
+    } else {
+      await createCourse(payload);
+      router.push("/admin/courses");
+    }
     router.refresh();
   });
 
   return (
     <FormProvider {...methods}>
       <div className="min-w-0 max-w-full overflow-x-hidden">
+        {loadError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+            <p>{loadError}</p>
+            <Button asChild variant="outline" size="sm" className="mt-2">
+              <Link href="/admin/courses">Back to courses</Link>
+            </Button>
+          </div>
+        )}
+        {loadingEdit && (
+          <div className="flex items-center justify-center py-12 text-zinc-600">Loading course…</div>
+        )}
+        {!loadingEdit && !loadError && (
         <div className="grid gap-6 xl:grid-cols-[1fr_360px] xl:gap-10">
         <form onSubmit={submit} className="min-w-0 space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <Button asChild variant="outline" size="sm" className="rounded-xl border-zinc-200">
-                <Link href="/admin/courses">
+                <Link href={editId ? `/admin/courses/${editId}` : "/admin/courses"}>
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
               </Button>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight text-zinc-900">Add new course</h1>
-                <p className="text-sm text-zinc-600">Modern admin form with cover + publishing.</p>
+                <h1 className="text-xl font-bold tracking-tight text-zinc-900">
+                  {editId ? "Edit course" : "Add new course"}
+                </h1>
+                <p className="text-sm text-zinc-600">
+                  {editId ? "Update course details and publishing." : "Modern admin form with cover + publishing."}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -374,7 +492,7 @@ export default function AdminCourseNewPage() {
                 className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
               >
                 <Check className="h-4 w-4" />
-                Create course
+                {editId ? "Save changes" : "Create course"}
               </Button>
             </div>
           </div>
@@ -427,13 +545,19 @@ export default function AdminCourseNewPage() {
                     )}
                   </FormField>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <FormSelect
                       name="tag"
                       label="Category"
                       required
-                      options={TAG_OPTIONS as unknown as { value: string; label: string }[]}
-                      placeholder="Select category"
+                      options={categoryOptions.map((c) => ({ value: c, label: c }))}
+                      placeholder={categoryOptions.length === 0 ? "Add categories in Settings" : "Select category"}
+                    />
+                    <FormSelect
+                      name="status"
+                      label="Status"
+                      options={STATUS_OPTIONS as unknown as { value: string; label: string }[]}
+                      placeholder="Select status"
                     />
                     <FormSelect
                       name="level"
@@ -500,15 +624,40 @@ export default function AdminCourseNewPage() {
                           )}
                         </FormField>
 
+                        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                          <div>
+                            <p className="text-sm font-semibold text-zinc-900">Free course</p>
+                            <p className="text-xs text-zinc-500">
+                              No payment required; students can enroll for free.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={isFreeCourse}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                methods.setValue("priceRegular", 0, { shouldDirty: true });
+                                methods.setValue("priceSale", undefined, { shouldDirty: true });
+                                methods.setValue("discountPercent", 0, { shouldDirty: true });
+                              } else {
+                                methods.setValue("priceRegular", 99, { shouldDirty: true });
+                                methods.setValue("priceSale", undefined, { shouldDirty: true });
+                                methods.setValue("discountPercent", 0, { shouldDirty: true });
+                              }
+                            }}
+                            className="data-[state=checked]:bg-emerald-500"
+                          />
+                        </div>
+
                         <div className="grid gap-4 sm:grid-cols-3">
-                          <FormField name="priceRegular" label="Original Price" required>
+                          <FormField name="priceRegular" label="Original Price">
                             {({ id, error, ...rest }) => (
                               <div className="space-y-1.5">
                                 <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
                                   <select
                                     value={methods.watch("currency") ?? "USD"}
                                     onChange={(e) => methods.setValue("currency", e.target.value)}
-                                    className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none"
+                                    disabled={isFreeCourse}
+                                    className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
                                   >
                                     {CURRENCY_OPTIONS.map((c) => (
                                       <option key={c.value} value={c.value}>
@@ -522,20 +671,22 @@ export default function AdminCourseNewPage() {
                                     type="number"
                                     step="0.01"
                                     min="0"
-                                    className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0"
+                                    className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
+                                    disabled={isFreeCourse}
                                     {...rest}
                                   />
                                 </div>
                               </div>
                             )}
                           </FormField>
-                          <FormField name="priceSale" label="Sale Price" required>
+                          <FormField name="priceSale" label="Sale Price">
                             {({ id, error, ...rest }) => (
                               <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
                                 <select
                                   value={methods.watch("currency") ?? "USD"}
                                   onChange={(e) => methods.setValue("currency", e.target.value)}
-                                  className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none"
+                                  disabled={isFreeCourse}
+                                  className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
                                 >
                                   {CURRENCY_OPTIONS.map((c) => (
                                     <option key={c.value} value={c.value}>
@@ -549,13 +700,14 @@ export default function AdminCourseNewPage() {
                                   type="number"
                                   step="0.01"
                                   min="0"
-                                  className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0"
+                                  className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
                                   {...rest}
                                   onBlur={(e) => {
                                     const maybeOnBlur = (rest as { onBlur?: (ev: React.FocusEvent<HTMLInputElement>) => void }).onBlur;
                                     maybeOnBlur?.(e);
                                     syncDiscountFromSale();
                                   }}
+                                  disabled={isFreeCourse}
                                 />
                               </div>
                             )}
@@ -570,13 +722,14 @@ export default function AdminCourseNewPage() {
                                   step="1"
                                   min="0"
                                   max="100"
-                                  className="rounded-xl border-0 focus-visible:ring-0"
+                                  className="rounded-xl border-0 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
                                   {...rest}
                                   onBlur={(e) => {
                                     const maybeOnBlur = (rest as { onBlur?: (ev: React.FocusEvent<HTMLInputElement>) => void }).onBlur;
                                     maybeOnBlur?.(e);
                                     syncSaleFromDiscount();
                                   }}
+                                  disabled={isFreeCourse}
                                 />
                                 <span className="px-3 text-sm text-zinc-500">%</span>
                               </div>
@@ -584,7 +737,7 @@ export default function AdminCourseNewPage() {
                           </FormField>
                         </div>
                         <p className="text-xs text-zinc-500">
-                          Sale price and discount % stay in sync.
+                          Sale price and discount % stay in sync. Leave both prices at 0 for a free course.
                         </p>
                       </div>
                     </CardContent>
@@ -695,22 +848,34 @@ export default function AdminCourseNewPage() {
                       >
                         {instructorImageUrl ? (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Image
-                              src={instructorImageUrl}
-                              alt="Profile"
-                              width={40}
-                              height={40}
-                              className="h-10 w-10 rounded-full object-cover ring-2 ring-zinc-200"
-                              unoptimized
-                            />
-                            <span className="text-[10px] font-medium text-zinc-600">Change</span>
+                            {profileUploading ? (
+                              <span className="text-xs text-amber-600">Uploading…</span>
+                            ) : (
+                              <>
+                                <Image
+                                  src={instructorImageUrl}
+                                  alt="Profile"
+                                  width={40}
+                                  height={40}
+                                  className="h-10 w-10 rounded-full object-cover ring-2 ring-zinc-200"
+                                  unoptimized
+                                />
+                                <span className="text-[10px] font-medium text-zinc-600">Change</span>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <>
-                            <UploadCloud className="h-4 w-4 text-zinc-500" />
-                            <span className="text-[10px] font-medium text-zinc-700">
-                              Drop or click
-                            </span>
+                            {profileUploading ? (
+                              <span className="text-xs text-amber-600">Uploading…</span>
+                            ) : (
+                              <>
+                                <UploadCloud className="h-4 w-4 text-zinc-500" />
+                                <span className="text-[10px] font-medium text-zinc-700">
+                                  Drop or click
+                                </span>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
@@ -1216,6 +1381,7 @@ export default function AdminCourseNewPage() {
                   </div>
                   <div className="text-sm font-semibold text-zinc-900">Click to upload</div>
                   <div className="text-xs text-zinc-500">or drag & drop (PNG/JPG/GIF, max 5MB)</div>
+                  {coverUploading ? <div className="text-xs text-amber-600">Uploading…</div> : null}
                 </div>
 
                 {coverError ? <p className="text-sm text-destructive">{coverError}</p> : null}
@@ -1363,6 +1529,7 @@ export default function AdminCourseNewPage() {
           )}
         </aside>
         </div>
+        )}
       </div>
     </FormProvider>
   );

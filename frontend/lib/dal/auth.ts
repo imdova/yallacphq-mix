@@ -4,11 +4,13 @@ import {
   authMeResponseSchema,
   authRefreshResponseSchema,
   authUserResponseSchema,
+  changePasswordResponseSchema,
   forgotPasswordResponseSchema,
   loginBodySchema,
   resetPasswordResponseSchema,
   signupBodySchema,
 } from "@/lib/api/contracts/auth";
+import type { ChangePasswordBody } from "@/lib/api/contracts/auth";
 import type { z } from "zod";
 
 export type LoginInput = z.infer<typeof loginBodySchema>;
@@ -48,5 +50,11 @@ export async function authResetPassword(token: string, newPassword: string) {
     { token, newPassword },
     { schema: resetPasswordResponseSchema }
   );
+}
+
+export async function changePassword(body: ChangePasswordBody) {
+  return apiPost("/api/auth/change-password", body, {
+    schema: changePasswordResponseSchema,
+  });
 }
 

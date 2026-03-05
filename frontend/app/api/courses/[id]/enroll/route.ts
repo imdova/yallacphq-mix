@@ -13,7 +13,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
 
     const course = await getCourseById(ctx.params.id);
     if (!course) return jsonError(404, "Not found");
-    if ((course.visibility ?? "public") !== "public" || (course.status ?? "published") !== "published") {
+    if ((course.status ?? "published") !== "published") {
       return jsonError(404, "Not found");
     }
 

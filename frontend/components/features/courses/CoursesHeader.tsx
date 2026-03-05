@@ -14,6 +14,7 @@ import {
 import { Menu, ChevronDown, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OFFERS_DROPDOWN_ITEMS, WEBINARS_DROPDOWN_ITEMS, ROUTES } from "@/constants";
+import { useCart } from "@/contexts/cart-context";
 
 const navLinks = [
   { href: "/courses", label: "All Courses" },
@@ -25,6 +26,8 @@ const navLinks = [
 export function CoursesHeader() {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
+  const { courseIds } = useCart();
+  const cartCount = courseIds.length;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
@@ -106,11 +109,16 @@ export function CoursesHeader() {
             asChild
             variant="ghost"
             size="icon"
-            className="rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-            aria-label="Cart"
+            className="relative rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+            aria-label={cartCount > 0 ? `Cart (${cartCount} items)` : "Cart"}
           >
-            <Link href={ROUTES.CHECKOUT}>
+            <Link href="/cart">
               <ShoppingCart className="h-5 w-5" />
+              {cartCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-bold text-gold-foreground">
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              ) : null}
             </Link>
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
@@ -167,12 +175,12 @@ export function CoursesHeader() {
                 ))}
                 <div className="flex flex-col gap-2 pt-4">
                   <Link
-                    href={ROUTES.CHECKOUT}
+                    href="/cart"
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900"
                   >
                     <ShoppingCart className="h-5 w-5" />
-                    Cart
+                    Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                   </Link>
                   <Link href="/dashboard" onClick={() => setOpen(false)} className="text-zinc-600 hover:text-zinc-900">
                     Login

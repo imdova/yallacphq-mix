@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrdersService } from '../orders/orders.service';
 import { toApiOrder } from '../orders/order.mapper';
 import { UsersService } from '../users/users.service';
+import { CoursesService } from '../courses/courses.service';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -38,6 +39,7 @@ export class CheckoutController {
   constructor(
     private readonly orders: OrdersService,
     private readonly users: UsersService,
+    private readonly courses: CoursesService,
   ) {}
 
   @Post('session')
@@ -63,6 +65,8 @@ export class CheckoutController {
       discountAmount: body.discountAmount,
       promoCode: body.promoCode,
       provider: 'stripe',
+      userId: jwtUser.sub,
+      courseIds: body.courseIds?.length ? body.courseIds : undefined,
     });
 
     return {
@@ -87,8 +91,22 @@ export class CheckoutController {
       transactionId: body.transactionId,
     });
     if (!updated) {
-      // Response schema expects order; returning a missing order should be treated as error.
       throw new Error('Order not found');
+    }
+    if (
+      updated.status === 'paid' &&
+      updated.userId &&
+      updated.courseIds?.length
+    ) {
+      for (const courseId of updated.courseIds) {
+        const newlyAdded = await this.users.addEnrolledCourse(
+          updated.userId,
+          courseId,
+        );
+        if (newlyAdded) {
+          await this.courses.incrementEnrolledCount(courseId, 1);
+        }
+      }
     }
     return { ok: true, order: toApiOrder(updated) };
   }

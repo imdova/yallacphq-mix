@@ -35,6 +35,12 @@ export class User {
 
   @Prop()
   speciality?: string;
+
+  @Prop()
+  profileImageUrl?: string;
+
+  @Prop({ type: [String], default: undefined })
+  enrolledCourseIds?: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { VersioningType } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import { Logger } from 'nestjs-pino';
@@ -11,10 +12,36 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
 
-  // Increase JSON body limit (default is 100kb). Do not use rawBody: true — it leaves req.body empty on many setups.
-  app.useBodyParser('json', { limit: '10mb' });
+  // Custom JSON body parser so req.body is always populated (fixes empty body on versioned routes)
+  const JSON_BODY_LIMIT = 10 * 1024 * 1024; // 10mb
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.method === 'GET' || req.method === 'HEAD') return next();
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    if (!ct.includes('application/json')) return next();
+    const chunks: Buffer[] = [];
+    let length = 0;
+    req.on('data', (chunk: Buffer) => {
+      length += chunk.length;
+      if (length > JSON_BODY_LIMIT) {
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        (req as express.Request & { body: unknown }).body = raw?.trim() ? JSON.parse(raw) : {};
+      } catch {
+        (req as express.Request & { body: unknown }).body = {};
+      }
+      next();
+    });
+    req.on('error', next);
+  });
 
   app.useLogger(app.get(Logger));
 

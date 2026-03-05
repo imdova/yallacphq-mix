@@ -70,7 +70,14 @@ export function StudentDashboardHeader() {
                 </p>
                 <p className="text-xs text-zinc-500">{user?.email ?? ""}</p>
               </div>
-              <div className="h-9 w-9 shrink-0 rounded-full bg-zinc-200 bg-cover bg-center" />
+              <div
+                className="h-9 w-9 shrink-0 rounded-full bg-zinc-200 bg-cover bg-center"
+                style={
+                  user?.profileImageUrl
+                    ? { backgroundImage: `url(${user.profileImageUrl})` }
+                    : undefined
+                }
+              />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">

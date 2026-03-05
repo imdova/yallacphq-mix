@@ -19,16 +19,23 @@ const ROLE_OPTIONS = [
   { value: "student", label: "Student" },
 ] as const;
 
+/** Sentinel value for "no selection" in Select (Radix does not allow empty string). */
+const EMPTY_SELECT_VALUE = "__none__";
+
 export function UserUpsertModal({
   open,
   mode,
   user,
+  countryOptions = [],
+  specialityOptions = [],
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   mode: "create" | "edit";
   user?: User | null;
+  countryOptions?: string[];
+  specialityOptions?: string[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: CreateUserSchema) => void | Promise<void>;
 }) {
@@ -45,14 +52,23 @@ export function UserUpsertModal({
       role: (user?.role ?? "student") as CreateUserSchema["role"],
       phone: user?.phone ?? "",
       course: user?.course ?? "",
-      country: user?.country ?? "",
-      speciality: user?.speciality ?? "",
+      country:
+        countryOptions.length > 0
+          ? (user?.country?.trim() || EMPTY_SELECT_VALUE)
+          : (user?.country ?? ""),
+      speciality:
+        specialityOptions.length > 0
+          ? (user?.speciality?.trim() || EMPTY_SELECT_VALUE)
+          : (user?.speciality ?? ""),
     }),
-    [user]
+    [user, countryOptions.length, specialityOptions.length]
   );
 
   const handleSubmit = async (data: CreateUserSchema) => {
-    await onSubmit(data);
+    const payload = { ...data } as CreateUserSchema & { country?: string; speciality?: string };
+    if (payload.country === EMPTY_SELECT_VALUE) payload.country = "";
+    if (payload.speciality === EMPTY_SELECT_VALUE) payload.speciality = "";
+    await onSubmit(payload as CreateUserSchema);
     onOpenChange(false);
   };
 
@@ -101,16 +117,40 @@ export function UserUpsertModal({
                   <FormInput id={id} error={error} placeholder="e.g. CPHQ Exam Prep" {...rest} />
                 )}
               </FormField>
-              <FormField name="country" label="Country">
-                {({ id, error, ...rest }) => (
-                  <FormInput id={id} error={error} placeholder="e.g. Egypt" {...rest} />
-                )}
-              </FormField>
-              <FormField name="speciality" label="Speciality">
-                {({ id, error, ...rest }) => (
-                  <FormInput id={id} error={error} placeholder="e.g. Quality Management" {...rest} />
-                )}
-              </FormField>
+              {countryOptions.length > 0 ? (
+                <FormSelect
+                  name="country"
+                  label="Country"
+                  options={[
+                    { value: EMPTY_SELECT_VALUE, label: "—" },
+                    ...countryOptions.map((c) => ({ value: c, label: c })),
+                  ]}
+                  placeholder="Select country"
+                />
+              ) : (
+                <FormField name="country" label="Country">
+                  {({ id, error, ...rest }) => (
+                    <FormInput id={id} error={error} placeholder="e.g. Egypt" {...rest} />
+                  )}
+                </FormField>
+              )}
+              {specialityOptions.length > 0 ? (
+                <FormSelect
+                  name="speciality"
+                  label="Speciality"
+                  options={[
+                    { value: EMPTY_SELECT_VALUE, label: "—" },
+                    ...specialityOptions.map((s) => ({ value: s, label: s })),
+                  ]}
+                  placeholder="Select speciality"
+                />
+              ) : (
+                <FormField name="speciality" label="Speciality">
+                  {({ id, error, ...rest }) => (
+                    <FormInput id={id} error={error} placeholder="e.g. Quality Management" {...rest} />
+                  )}
+                </FormField>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

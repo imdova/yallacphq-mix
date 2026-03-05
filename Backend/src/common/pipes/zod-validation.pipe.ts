@@ -8,12 +8,30 @@ export class ZodValidationPipe implements PipeTransform {
   transform(value: unknown) {
     let input = value;
     if (typeof input === 'string') {
-      try {
-        input = JSON.parse(input) as unknown;
-      } catch {
+      const trimmed = input.trim();
+      if (!trimmed) {
+        throw new BadRequestException({
+          message: 'Body must be a JSON object',
+          code: 'VALIDATION_ERROR',
+          issues: [{ message: 'Body is empty or whitespace', path: [], code: 'invalid_type' }],
+        });
+      }
+      if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
         throw new BadRequestException({
           message: 'Invalid JSON body',
           code: 'INVALID_JSON',
+          details: 'Body must be valid JSON (object or array). Send with Content-Type: application/json.',
+        });
+      }
+      try {
+        input = JSON.parse(trimmed) as unknown;
+      } catch (parseErr) {
+        const detail =
+          parseErr instanceof Error ? parseErr.message : 'JSON parse failed';
+        throw new BadRequestException({
+          message: 'Invalid JSON body',
+          code: 'INVALID_JSON',
+          details: detail,
         });
       }
     }

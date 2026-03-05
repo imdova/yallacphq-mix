@@ -11,6 +11,13 @@ export class SignupBodyDto {
 
   @ApiProperty({ example: 'StrongPassw0rd!', minLength: 8 })
   password!: string;
+
+  @ApiProperty({
+    example: 'Quality Management',
+    description: 'Healthcare specialty (from admin-configured list)',
+    minLength: 1,
+  })
+  speciality!: string;
 }
 
 export class LoginBodyDto {
@@ -81,3 +88,13 @@ export class ResetPasswordBodyDto {
 }
 
 export class ResetPasswordResponseDto extends ApiOkDto {}
+
+export class ChangePasswordBodyDto {
+  @ApiProperty({ example: 'CurrentPassw0rd!', description: 'Current password' })
+  currentPassword!: string;
+
+  @ApiProperty({ example: 'NewStrongPassw0rd!', minLength: 8 })
+  newPassword!: string;
+}
+
+export class ChangePasswordResponseDto extends ApiOkDto {}

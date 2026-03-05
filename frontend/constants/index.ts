@@ -4,6 +4,18 @@
 
 export const APP_NAME = "Yalla CPHQ";
 
+/** Admin sidebar header: title (e.g. "Admin") and subtitle (e.g. app/brand name). */
+export const ADMIN_SIDEBAR_BRANDING = {
+  title: "Admin",
+  subtitle: APP_NAME,
+} as const;
+
+/** Student sidebar header: title (e.g. app/brand name) and subtitle (e.g. "Student Portal"). */
+export const STUDENT_SIDEBAR_BRANDING = {
+  title: APP_NAME,
+  subtitle: "Student Portal",
+} as const;
+
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
@@ -18,6 +30,7 @@ export const ROUTES = {
   WEBINARS: "/webinars",
   CPHQ_WEBINAR_1: "/webinars/cphq-webinar-1",
   COURSE_DETAILS: "/course-details",
+  CART: "/cart",
   CHECKOUT: "/checkout",
   PAY_CREDIT_PAYPAL: "/pay-credit-paypal1",
 } as const;

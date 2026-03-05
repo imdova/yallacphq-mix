@@ -33,9 +33,7 @@ export async function GET() {
 
   const all = await getCourses();
   const items = all.filter(
-    (c) =>
-      (c.visibility ?? "public") === "public" &&
-      (c.status ?? "published") === "published"
+    (c) => (c.status ?? "published") === "published"
   );
   return jsonOk(publicCoursesResponseSchema.parse({ items }));
 }

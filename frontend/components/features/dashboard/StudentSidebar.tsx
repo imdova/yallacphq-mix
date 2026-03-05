@@ -3,36 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/auth-context";
-import {
-  LayoutDashboard,
-  BookOpen,
-  HelpCircle,
-  Award,
-  User,
-  ReceiptText,
-  Users,
-  Settings,
-  Lightbulb,
-  Shield,
-} from "lucide-react";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/profile", label: "Profile", icon: User },
-  { href: "/dashboard/courses", label: "My Courses", icon: BookOpen },
-  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
-  { href: "/dashboard/quizzes", label: "Practice Quizzes", icon: HelpCircle },
-  { href: "/dashboard/certifications", label: "Certifications", icon: Award },
-  { href: "/dashboard/community", label: "Community", icon: Users },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-];
+import { STUDENT_NAV_ITEMS } from "@/components/features/dashboard/student-nav-config";
+import { STUDENT_SIDEBAR_BRANDING } from "@/constants";
+import { Lightbulb } from "lucide-react";
 
 export function StudentSidebar() {
   const pathname = usePathname();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-white">
@@ -41,13 +17,16 @@ export function StudentSidebar() {
           <Lightbulb className="h-5 w-5" />
         </span>
         <div className="flex flex-col">
-          <span className="font-semibold tracking-tight">Yalla CPHQ</span>
-          <span className="text-xs uppercase tracking-wider text-zinc-400">Student Portal</span>
+          <span className="font-semibold tracking-tight">{STUDENT_SIDEBAR_BRANDING.title}</span>
+          <span className="text-xs uppercase tracking-wider text-zinc-400">
+            {STUDENT_SIDEBAR_BRANDING.subtitle}
+          </span>
         </div>
       </div>
       <nav className="flex-1 space-y-0.5 p-3" aria-label="Main">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+        {STUDENT_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          const isActive =
+            pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
             <Link key={href} href={href}>
               <span
@@ -64,39 +43,25 @@ export function StudentSidebar() {
             </Link>
           );
         })}
-        {isAdmin && (
-          <Link href="/admin">
-            <span
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                pathname?.startsWith("/admin")
-                  ? "bg-gold text-gold-foreground"
-                  : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-              )}
-            >
-              <Shield className="h-4 w-4 shrink-0" aria-hidden />
-              Admin
-            </span>
-          </Link>
-        )}
       </nav>
-      <div className="border-t border-zinc-800 p-3 space-y-3">
-        <Button
-          asChild
-          className="w-full rounded-lg bg-gold text-gold-foreground hover:bg-gold/90 font-semibold"
+      <div className="space-y-3 border-t border-zinc-800 p-3">
+        <Link
+          href="/dashboard/premium"
+          className="flex w-full items-center justify-center rounded-lg bg-gold px-3 py-2.5 text-sm font-semibold text-gold-foreground hover:bg-gold/90"
         >
-          <Link href="/dashboard/premium">Go Premium</Link>
-        </Button>
+          Go Premium
+        </Link>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Help Center</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Help Center
+          </p>
           <p className="mt-0.5 text-sm text-zinc-500">Facing issues? Contact support</p>
-          <Button
-            asChild
-            variant="ghost"
-            className="mt-2 w-full text-zinc-300 hover:bg-zinc-800 hover:text-white font-medium"
+          <Link
+            href="/dashboard/support"
+            className="mt-2 flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white"
           >
-            <Link href="/dashboard/support">Get Support</Link>
-          </Button>
+            Get Support
+          </Link>
         </div>
       </div>
     </aside>

@@ -496,10 +496,10 @@ export function AdminCourseDetailsView() {
         </Card>
         <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
           <CardContent className="p-4 sm:p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Visibility</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Status</div>
             <div className="mt-2 flex items-center gap-2 text-xl sm:text-2xl font-bold text-zinc-900">
               <GraduationCap className="h-5 w-5 shrink-0 text-zinc-500" />
-              {course.visibility ?? "public"}
+              {course.status ?? "draft"}
             </div>
             <div className="mt-1 text-xs text-zinc-500">Enrollment {course.enableEnrollment ? "enabled" : "off"}</div>
           </CardContent>

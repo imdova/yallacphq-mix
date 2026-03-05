@@ -6,8 +6,7 @@ import {
   adminUserResponseSchema,
   currentUserResponseSchema,
   listUsersResponseSchema,
-  updateCurrentUserBodySchema,
-  userSchema,
+  type UpdateCurrentUserBody,
 } from "@/lib/api/contracts/user";
 import { getErrorStatus } from "@/lib/api/error";
 
@@ -59,15 +58,25 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 }
 
-export async function updateCurrentUser(
-  data: z.infer<typeof updateCurrentUserBodySchema>
-): Promise<User> {
+export async function updateCurrentUser(data: UpdateCurrentUserBody): Promise<User> {
   const res = await apiPatch("/api/me", data, { schema: currentUserResponseSchema });
   return res.user as User;
 }
 
-export async function getUsers(): Promise<User[]> {
-  const res = await apiGet("/api/admin/users", { schema: listUsersResponseSchema });
+export async function getUsers(params?: {
+  search?: string;
+  country?: string;
+  speciality?: string;
+  enrollment?: string;
+}): Promise<User[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.search?.trim()) searchParams.set("search", params.search.trim());
+  if (params?.country?.trim() && params.country !== "all") searchParams.set("country", params.country.trim());
+  if (params?.speciality?.trim() && params.speciality !== "all") searchParams.set("speciality", params.speciality.trim());
+  if (params?.enrollment && params.enrollment !== "all") searchParams.set("enrollment", params.enrollment);
+  const query = searchParams.toString();
+  const url = `/api/admin/users${query ? `?${query}` : ""}`;
+  const res = await apiGet(url, { schema: listUsersResponseSchema });
   return res.items as User[];
 }
 

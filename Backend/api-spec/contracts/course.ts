@@ -21,7 +21,6 @@ export const courseSchema = z.object({
   lessons: z.number().optional(),
 
   status: z.enum(["draft", "published"]).optional(),
-  visibility: z.enum(["public", "private"]).optional(),
   enableEnrollment: z.boolean().optional(),
   requireApproval: z.boolean().optional(),
   socialSharing: z.boolean().optional(),
@@ -61,7 +60,6 @@ export const createCourseBodySchema = z.object({
   instructorTitle: z.string().min(1),
   durationHours: z.number().min(0),
   status: z.enum(["draft", "published"]).optional(),
-  visibility: z.enum(["public", "private"]).optional(),
   enableEnrollment: z.boolean().optional(),
   requireApproval: z.boolean().optional(),
   socialSharing: z.boolean().optional(),

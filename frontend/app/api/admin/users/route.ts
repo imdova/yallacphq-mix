@@ -14,8 +14,20 @@ export async function GET(req: Request) {
   if (isBackendConfigured()) {
     const cookieHeader = req.headers.get("cookie") ?? "";
     const backendUrl = getBackendUrl();
+    const url = new URL(req.url ?? "", "http://localhost");
+    const search = url.searchParams.get("search") ?? "";
+    const country = url.searchParams.get("country") ?? "";
+    const speciality = url.searchParams.get("speciality") ?? "";
+    const enrollment = url.searchParams.get("enrollment") ?? "";
+    const query = new URLSearchParams();
+    if (search) query.set("search", search);
+    if (country) query.set("country", country);
+    if (speciality) query.set("speciality", speciality);
+    if (enrollment) query.set("enrollment", enrollment);
+    const queryString = query.toString();
+    const backendPath = `${backendUrl}${BACKEND_API_PREFIX}/admin/users${queryString ? `?${queryString}` : ""}`;
     try {
-      const res = await fetch(`${backendUrl}${BACKEND_API_PREFIX}/admin/users`, {
+      const res = await fetch(backendPath, {
         method: "GET",
         headers: { cookie: cookieHeader, "x-request-id": requestId },
       });
@@ -35,7 +47,24 @@ export async function GET(req: Request) {
 
   try {
     await requireAdmin();
-    const items = await db.getUsers();
+    let items = await db.getUsers();
+    const url = new URL(req.url ?? "", "http://localhost");
+    const search = url.searchParams.get("search")?.trim() ?? "";
+    const country = url.searchParams.get("country")?.trim() ?? "";
+    const speciality = url.searchParams.get("speciality")?.trim() ?? "";
+    const enrollment = url.searchParams.get("enrollment") ?? "";
+    if (search || country || speciality || (enrollment && enrollment !== "all")) {
+      const q = search.toLowerCase();
+      items = items.filter((u) => {
+        if (q && !(u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.phone?.toLowerCase().includes(q)))
+          return false;
+        if (country && (u.country?.trim() ?? "") !== country) return false;
+        if (speciality && (u.speciality?.trim() ?? "") !== speciality) return false;
+        if (enrollment === "enrolled" && !u.enrolled) return false;
+        if (enrollment === "not_enrolled" && u.enrolled) return false;
+        return true;
+      });
+    }
     return jsonOk(listUsersResponseSchema.parse({ items }));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unexpected error";

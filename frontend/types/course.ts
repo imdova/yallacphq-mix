@@ -18,7 +18,6 @@ export interface Course {
   enrolledCount?: number;
   lessons?: number;
   status?: "draft" | "published";
-  visibility?: "public" | "private";
   enableEnrollment?: boolean;
   requireApproval?: boolean;
   socialSharing?: boolean;
@@ -54,7 +53,6 @@ export interface CreateCourseInput {
   instructorTitle: string;
   durationHours: number;
   status?: "draft" | "published";
-  visibility?: "public" | "private";
   enableEnrollment?: boolean;
   requireApproval?: boolean;
   socialSharing?: boolean;

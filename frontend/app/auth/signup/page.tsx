@@ -16,13 +16,13 @@ import {
 import { User, Mail, Briefcase, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { signupBodySchema } from "@/lib/api/contracts/auth";
+import { getPublicStudentFieldOptions } from "@/lib/dal/settings";
 
-const SPECIALTIES = [
-  "Physician",
-  "Nurse",
-  "Quality Manager",
-  "Healthcare Administrator",
-  "Pharmacist",
+const FALLBACK_SPECIALITIES = [
+  "Quality Management",
+  "Patient Safety",
+  "Healthcare Administration",
+  "Compliance",
   "Other",
 ];
 
@@ -46,6 +46,14 @@ export default function AuthSignupPage() {
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const [specialities, setSpecialities] = React.useState<string[]>(FALLBACK_SPECIALITIES);
+
+  React.useEffect(() => {
+    getPublicStudentFieldOptions().then((opts) => {
+      const list = opts.specialities?.length ? opts.specialities : FALLBACK_SPECIALITIES;
+      setSpecialities(list);
+    });
+  }, []);
 
   React.useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -56,7 +64,7 @@ export default function AuthSignupPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
-    const parsed = signupBodySchema.safeParse({ name, email, password });
+    const parsed = signupBodySchema.safeParse({ name, email, password, speciality });
     if (!parsed.success) {
       setFieldErrors(fieldErrorsFromZod(parsed));
       return;
@@ -169,16 +177,20 @@ export default function AuthSignupPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-zinc-700">
-                  Healthcare Specialty
+                  Healthcare Specialty <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Briefcase className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                  <Select value={speciality} onValueChange={setSpeciality}>
-                    <SelectTrigger className="h-11 pl-10 rounded-lg border-zinc-200">
+                  <Select
+                    value={speciality}
+                    onValueChange={setSpeciality}
+                    required
+                  >
+                    <SelectTrigger className={`h-11 pl-10 rounded-lg border-zinc-200 ${fieldErrors.speciality ? "border-red-500 focus-visible:ring-red-500" : ""}`}>
                       <SelectValue placeholder="Select your specialty" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SPECIALTIES.map((s) => (
+                      {specialities.map((s) => (
                         <SelectItem key={s} value={s}>
                           {s}
                         </SelectItem>
@@ -186,6 +198,11 @@ export default function AuthSignupPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {fieldErrors.speciality ? (
+                  <p className="text-sm text-red-600">{fieldErrors.speciality}</p>
+                ) : (
+                  <p className="text-xs text-zinc-500">Choose the specialty set by your institution.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-zinc-700">

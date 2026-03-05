@@ -21,6 +21,10 @@ export class Order {
   @Prop()
   studentPhone?: string;
 
+  /** Set when order is created from checkout (authenticated user). Used to enroll on payment confirm. */
+  @Prop()
+  userId?: string;
+
   @Prop({ required: true })
   courseTitle!: string;
 
@@ -55,6 +59,9 @@ export class Order {
 
   @Prop()
   transactionId?: string;
+
+  @Prop({ type: [String], default: undefined })
+  courseIds?: string[];
 
   @Prop()
   paidAt?: string;

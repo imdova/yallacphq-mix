@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getCurrentUser } from "@/lib/dal/user";
+import { useAuth } from "@/contexts/auth-context";
 import type { User } from "@/types/user";
 import {
   Building2,
@@ -78,15 +79,32 @@ export function StudentProfileView() {
   const [me, setMe] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const { user: authUser, status } = useAuth();
+
+  // Prefer auth context user (stays in sync after Settings save); fallback to fetched me
+  const displayUser: User | null = authUser ?? me;
 
   React.useEffect(() => {
+    if (status !== "authenticated") {
+      setLoading(false);
+      if (status === "unauthenticated") setLoadError("Please sign in to view your profile.");
+      return;
+    }
+    if (authUser) {
+      setMe(authUser);
+      setLoading(false);
+      setLoadError(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
       setLoadError(null);
       try {
         const user = await getCurrentUser();
-        if (!cancelled) setMe(user);
+        if (!cancelled) {
+          setMe(user);
+        }
       } catch (e) {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load profile");
       } finally {
@@ -96,15 +114,15 @@ export function StudentProfileView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [status, authUser]);
 
-  const displayName = me?.name?.trim() || "—";
-  const { firstName, lastName } = splitName(me?.name ?? "");
+  const displayName = displayUser?.name?.trim() || "—";
+  const { firstName, lastName } = splitName(displayUser?.name ?? "");
   const fullName = displayName;
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase() || "U";
-  const title = me?.speciality?.trim() || "Student";
-  const org = me?.course?.trim() || "Yalla CPHQ";
-  const location = me?.country?.trim() || "—";
+  const title = displayUser?.speciality?.trim() || "Student";
+  const org = displayUser?.course?.trim() || "Yalla CPHQ";
+  const location = displayUser?.country?.trim() || "—";
 
   const share = async () => {
     const url =

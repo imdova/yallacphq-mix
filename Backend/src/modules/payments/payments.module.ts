@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../../common/common.module';
+import { CoursesModule } from '../courses/courses.module';
 import { OrdersModule } from '../orders/orders.module';
 import { UsersModule } from '../users/users.module';
 import { CheckoutController } from './checkout.controller';
@@ -8,7 +9,7 @@ import { PaymentsService } from './payments.service';
 import { PAYMENTS_PROVIDER } from './payments.types';
 
 @Module({
-  imports: [CommonModule, OrdersModule, UsersModule],
+  imports: [CommonModule, OrdersModule, UsersModule, CoursesModule],
   controllers: [PaymentsController, CheckoutController],
   providers: [
     PaymentsService,

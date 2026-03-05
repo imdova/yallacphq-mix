@@ -20,6 +20,8 @@ import {
   Video,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { getMyCourses } from "@/lib/dal/courses";
+import type { Course } from "@/types/course";
 
 const stats = [
   { label: "Hours Studied", value: "42.5h", icon: Clock },
@@ -28,29 +30,28 @@ const stats = [
   { label: "Live Sessions", value: "3 Sessions", icon: Video },
 ];
 
-const coursesPreview = [
-  {
-    id: "cphq-mastery",
-    title: "CPHQ Mastery Prep",
-    nextLesson: "Healthcare Quality Management Tools",
-    progress: 68,
-  },
-  {
-    id: "patient-safety",
-    title: "Patient Safety Essentials",
-    nextLesson: "Root Cause Analysis (RCA)",
-    progress: 32,
-  },
-  {
-    id: "data-analytics",
-    title: "Data Analysis for Healthcare",
-    nextLesson: "Descriptive Statistics",
-    progress: 12,
-  },
-] as const;
-
 export function StudentDashboardView() {
   const { user } = useAuth();
+  const [courses, setCourses] = React.useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getMyCourses()
+      .then((list) => {
+        if (!cancelled) setCourses(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCourses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCoursesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const greeting = React.useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -59,6 +60,17 @@ export function StudentDashboardView() {
   }, []);
 
   const displayName = user?.name ?? "there";
+  const firstCourse = courses[0];
+  const coursesPreview = React.useMemo(
+    () =>
+      courses.slice(0, 3).map((c) => ({
+        id: c.id,
+        title: c.title,
+        nextLesson: "Continue learning",
+        progress: 0,
+      })),
+    [courses]
+  );
 
   const tasks = React.useMemo(
     () => [
@@ -129,25 +141,36 @@ export function StudentDashboardView() {
                   <div className="text-xs font-semibold uppercase tracking-wider text-white/70">
                     Continue
                   </div>
-                  <div className="mt-2 truncate text-xl font-bold">CPHQ Mastery Prep</div>
+                  <div className="mt-2 truncate text-xl font-bold">
+                    {firstCourse ? firstCourse.title : "My courses"}
+                  </div>
                   <div className="mt-1 text-sm text-white/70">
-                    Next: Healthcare Quality Management Tools · 18 min
+                    {firstCourse
+                      ? "Next: Continue learning"
+                      : coursesLoading
+                        ? "Loading…"
+                        : "Enroll in a course to get started."}
                   </div>
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full rounded-full bg-gold" style={{ width: "68%" }} />
+                  {firstCourse && (
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-gold" style={{ width: "0%" }} />
+                      </div>
+                      <div className="text-sm font-semibold text-gold">0%</div>
                     </div>
-                    <div className="text-sm font-semibold text-gold">68%</div>
-                  </div>
+                  )}
                 </div>
                 <div className="flex flex-col gap-2 sm:items-end">
                   <Button
                     asChild
                     className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
                   >
-                    <Link href="/dashboard/courses/lesson" className="inline-flex items-center gap-2">
+                    <Link
+                      href={firstCourse ? `/dashboard/courses/lesson?course=${firstCourse.id}` : "/dashboard/courses"}
+                      className="inline-flex items-center gap-2"
+                    >
                       <Play className="h-4 w-4" />
-                      Resume
+                      {firstCourse ? "Resume" : "View courses"}
                     </Link>
                   </Button>
                   <Button
@@ -172,26 +195,32 @@ export function StudentDashboardView() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-3">
-                {coursesPreview.map((c) => (
-                  <Link
-                    key={c.id}
-                    href="/dashboard/courses"
-                    className="block rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-zinc-900">{c.title}</div>
-                        <div className="truncate text-xs text-zinc-500">Next: {c.nextLesson}</div>
+                {coursesLoading ? (
+                  <p className="text-sm text-zinc-500">Loading your courses…</p>
+                ) : coursesPreview.length === 0 ? (
+                  <p className="text-sm text-zinc-500">You are not enrolled in any course yet.</p>
+                ) : (
+                  coursesPreview.map((c) => (
+                    <Link
+                      key={c.id}
+                      href="/dashboard/courses"
+                      className="block rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-zinc-900">{c.title}</div>
+                          <div className="truncate text-xs text-zinc-500">Next: {c.nextLesson}</div>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                          {c.progress}%
+                        </span>
                       </div>
-                      <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
-                        {c.progress}%
-                      </span>
-                    </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
-                      <div className="h-full rounded-full bg-gold" style={{ width: `${c.progress}%` }} />
-                    </div>
-                  </Link>
-                ))}
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
+                        <div className="h-full rounded-full bg-gold" style={{ width: `${c.progress}%` }} />
+                      </div>
+                    </Link>
+                  ))
+                )}
               </div>
               <div className="mt-4 flex justify-end">
                 <Button asChild variant="outline" className="rounded-xl border-zinc-200">

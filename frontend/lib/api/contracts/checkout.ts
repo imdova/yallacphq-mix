@@ -11,6 +11,7 @@ export const createPaymentSessionBodySchema = z.object({
   discountAmount: z.number().optional(),
   promoCode: z.string().optional(),
   idempotencyKey: z.string().min(8).optional(),
+  courseIds: z.array(z.string().min(1)).optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<typeof createPaymentSessionBodySchema>;

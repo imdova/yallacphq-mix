@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,6 +10,7 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ZodError } from 'zod';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { RequestUser } from '../../common/auth/current-user.decorator';
 import { ResponseSchema } from '../../common/decorators/response-schema.decorator';
@@ -29,6 +31,8 @@ import {
   AuthMeResponseDto,
   AuthRefreshResponseDto,
   AuthUserResponseDto,
+  ChangePasswordBodyDto,
+  ChangePasswordResponseDto,
   ForgotPasswordBodyDto,
   ForgotPasswordResponseDto,
   LoginBodyDto,
@@ -42,6 +46,8 @@ import {
   authMeResponseSchema,
   authRefreshResponseSchema,
   authUserResponseSchema,
+  changePasswordBodySchema,
+  changePasswordResponseSchema,
   forgotPasswordBodySchema,
   forgotPasswordResponseSchema,
   loginBodySchema,
@@ -55,6 +61,7 @@ import type {
   ResetPasswordBody,
   SignupBody,
 } from '../../contracts';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { toApiUser } from '../users/user.mapper';
 import { UsersService } from '../users/users.service';
@@ -240,5 +247,42 @@ export class AuthController {
     if (!user) return { user: null };
     const dbUser = await this.users.findById(user.sub);
     return { user: dbUser ? toApiUser(dbUser) : null };
+  }
+
+  @Post('change-password')
+  @Version('1')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Change password',
+    description: 'Change current user password (requires current password)',
+  })
+  @ApiAuth()
+  @ApiBody({ type: ChangePasswordBodyDto })
+  @ApiOkResponse({ type: ChangePasswordResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorDto })
+  @ResponseSchema(changePasswordResponseSchema)
+  async changePassword(@Req() req: Request, @CurrentUser() user: RequestUser) {
+    const body = (req as Request & { body?: unknown }).body;
+    if (body === undefined || body === null || typeof body !== 'object') {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: [{ message: 'Request body is required (JSON with currentPassword and newPassword)', path: [], code: 'invalid_type' }],
+      });
+    }
+    try {
+      const parsed = changePasswordBodySchema.parse(body);
+      await this.auth.changePassword(user.sub, parsed.currentPassword, parsed.newPassword);
+      return { ok: true as const };
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new BadRequestException({
+          message: 'Validation error',
+          code: 'VALIDATION_ERROR',
+          issues: err.issues,
+        });
+      }
+      throw err;
+    }
   }
 }

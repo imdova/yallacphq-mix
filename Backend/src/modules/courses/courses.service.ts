@@ -12,7 +12,7 @@ export class CoursesService {
 
   listPublished() {
     return this.courseModel
-      .find({ status: 'published', visibility: 'public' })
+      .find({ status: 'published' })
       .sort({ createdAt: -1 })
       .exec();
   }
@@ -33,11 +33,10 @@ export class CoursesService {
   ) {
     return this.courseModel.create({
       ...params,
-      rating: params.rating ?? 0,
-      reviewCount: params.reviewCount ?? 0,
-      status: params.status ?? 'draft',
-      visibility: params.visibility ?? 'private',
-      createdByUserId:
+    rating: params.rating ?? 0,
+    reviewCount: params.reviewCount ?? 0,
+    status: params.status ?? 'draft',
+    createdByUserId:
         params.createdByUserId && Types.ObjectId.isValid(params.createdByUserId)
           ? new Types.ObjectId(params.createdByUserId)
           : undefined,

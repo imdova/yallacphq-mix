@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { apiOkSchema } from './common';
+import { userSchema } from './user';
 
 export const courseSchema = z.object({
   id: z.string(),
@@ -21,7 +22,6 @@ export const courseSchema = z.object({
   lessons: z.number().optional(),
 
   status: z.enum(['draft', 'published']).optional(),
-  visibility: z.enum(['public', 'private']).optional(),
   enableEnrollment: z.boolean().optional(),
   requireApproval: z.boolean().optional(),
   socialSharing: z.boolean().optional(),
@@ -66,7 +66,6 @@ export const createCourseBodySchema = z.object({
   instructorTitle: z.string().min(1),
   durationHours: z.number().min(0),
   status: z.enum(['draft', 'published']).optional(),
-  visibility: z.enum(['public', 'private']).optional(),
   enableEnrollment: z.boolean().optional(),
   requireApproval: z.boolean().optional(),
   socialSharing: z.boolean().optional(),
@@ -156,3 +155,17 @@ export const enrollCourseResponseSchema = z.object({
 });
 
 export type EnrollCourseResponse = z.infer<typeof enrollCourseResponseSchema>;
+
+/** Admin: enroll a user in a course. Body: { userId } */
+export const adminEnrollUserBodySchema = z.object({
+  userId: z.string().min(1),
+});
+
+export type AdminEnrollUserBody = z.infer<typeof adminEnrollUserBodySchema>;
+
+export const adminEnrollUserResponseSchema = z.object({
+  ok: z.literal(true),
+  user: userSchema.optional(),
+});
+
+export type AdminEnrollUserResponse = z.infer<typeof adminEnrollUserResponseSchema>;

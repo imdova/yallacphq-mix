@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,10 +8,12 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
   UsePipes,
   Version,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -28,11 +31,13 @@ import {
   adminCourseNullableResponseSchema,
   adminCourseResponseSchema,
   adminDeleteCourseResponseSchema,
+  adminEnrollUserBodySchema,
+  adminEnrollUserResponseSchema,
   createCourseBodySchema,
   listCoursesResponseSchema,
   updateCourseBodySchema,
 } from '../../contracts';
-import type { CreateCourseBody, UpdateCourseBody } from '../../contracts';
+import type { CreateCourseBody, AdminEnrollUserBody } from '../../contracts';
 import {
   ApiOkDto,
   CourseResponseDto,
@@ -42,11 +47,16 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { toApiCourse } from './course.mapper';
 import { CoursesService } from './courses.service';
+import { UsersService } from '../users/users.service';
+import { toApiUser } from '../users/user.mapper';
 
 @ApiTags('admin', 'courses')
 @Controller('admin/courses')
 export class AdminCoursesController {
-  constructor(private readonly courses: CoursesService) {}
+  constructor(
+    private readonly courses: CoursesService,
+    private readonly users: UsersService,
+  ) {}
 
   @Get()
   @Version('1')
@@ -95,7 +105,6 @@ export class AdminCoursesController {
           instructorTitle: 'Quality Director',
           durationHours: 12,
           status: 'draft',
-          visibility: 'public',
           description: 'A complete course to prepare for the CPHQ certification exam.',
           whoCanAttend: 'Healthcare quality professionals',
           whyYalla: 'Expert instructors and practice exams',
@@ -134,15 +143,80 @@ export class AdminCoursesController {
   @Version('1')
   @Roles(AppRole.admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @UsePipes(new ZodValidationPipe(updateCourseBodySchema))
   @ResponseSchema(adminCourseResponseSchema)
   @ApiOperation({ summary: 'Admin: update course' })
   @ApiAuth()
   @ApiOkResponse({ type: CourseResponseDto })
-  async update(@Param('id') id: string, @Body() body: UpdateCourseBody) {
-    const updated = await this.courses.updateById(id, body);
+  async update(@Param('id') id: string, @Req() req: Request) {
+    const raw = req.body;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: [{ message: 'Body must be a JSON object', path: [], code: 'invalid_type' }],
+      });
+    }
+    const parsed = updateCourseBodySchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const updated = await this.courses.updateById(id, parsed.data);
     if (!updated) throw new NotFoundException('Course not found');
     return { course: toApiCourse(updated) };
+  }
+
+  @Post(':id/enroll-user')
+  @Version('1')
+  @Roles(AppRole.admin)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ResponseSchema(adminEnrollUserResponseSchema)
+  @ApiOperation({ summary: 'Admin: enroll a user in this course' })
+  @ApiAuth()
+  @ApiBody({ schema: { example: { userId: '65f3c77b0f6d1b5a3d1d9a10' } } })
+  @ApiOkResponse({ schema: { example: { ok: true, user: {} } } })
+  async enrollUser(
+    @Param('id') courseId: string,
+    @Req() req: Request,
+  ) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = rawBody.trim() ? (JSON.parse(rawBody) as unknown) : {};
+      } catch {
+        rawBody = {};
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      rawBody = {};
+    }
+    const parsed = adminEnrollUserBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const body: AdminEnrollUserBody = parsed.data;
+
+    const course = await this.courses.findById(courseId);
+    if (!course) throw new NotFoundException('Course not found');
+    const user = await this.users.findById(body.userId);
+    if (!user) throw new NotFoundException('User not found');
+    const newlyAdded = await this.users.addEnrolledCourse(body.userId, courseId);
+    if (newlyAdded) {
+      await this.courses.incrementEnrolledCount(courseId, 1);
+    }
+    await this.users.updateById(body.userId, { course: course.title });
+    const updatedUser = await this.users.findById(body.userId);
+    return {
+      ok: true as const,
+      user: updatedUser ? toApiUser(updatedUser) : undefined,
+    };
   }
 
   @Delete(':id')

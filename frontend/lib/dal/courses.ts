@@ -6,6 +6,7 @@ import {
   adminDeleteCourseResponseSchema,
   courseSchema,
   enrollCourseResponseSchema,
+  adminEnrollUserResponseSchema,
   publicCourseResponseSchema,
   publicCoursesResponseSchema,
   listCoursesResponseSchema,
@@ -61,6 +62,11 @@ export async function getPublicCourses(): Promise<Course[]> {
   return res.items as Course[];
 }
 
+export async function getMyCourses(): Promise<Course[]> {
+  const res = await apiGet("/api/me/courses", { schema: publicCoursesResponseSchema });
+  return (res.items as Course[]) ?? [];
+}
+
 export async function getPublicCourse(id: string): Promise<Course | null> {
   try {
     const res = await apiGet(`/api/courses/${encodeURIComponent(id)}`, { schema: publicCourseResponseSchema });
@@ -73,4 +79,17 @@ export async function getPublicCourse(id: string): Promise<Course | null> {
 // Enrollment
 export async function enrollCourse(courseId: string, userId?: string) {
   return apiPost(`/api/courses/${encodeURIComponent(courseId)}/enroll`, { userId }, { schema: enrollCourseResponseSchema });
+}
+
+/** Admin: enroll a user in a course. Returns the updated user when backend is configured. */
+export async function enrollUserInCourse(
+  courseId: string,
+  userId: string
+): Promise<{ ok: true; user?: import("@/types/user").User }> {
+  const res = await apiPost(
+    `/api/admin/courses/${encodeURIComponent(courseId)}/enroll-user`,
+    { userId },
+    { schema: adminEnrollUserResponseSchema }
+  );
+  return res as { ok: true; user?: import("@/types/user").User };
 }

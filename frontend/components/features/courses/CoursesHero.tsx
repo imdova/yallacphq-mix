@@ -4,19 +4,29 @@ import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
-import { COURSE_CATEGORIES } from "@/constants/courses";
 import { cn } from "@/lib/utils";
+
+const FALLBACK_CATEGORIES = [
+  { id: "all", label: "All Resources" },
+  { id: "Exam Prep", label: "Exam Prep" },
+  { id: "Quality Management", label: "Quality Management" },
+  { id: "Patient Safety", label: "Patient Safety" },
+  { id: "Free Resources", label: "Free Resources" },
+];
 
 export function CoursesHero({
   search,
   onSearchChange,
   category,
   onCategoryChange,
+  categoryOptions = FALLBACK_CATEGORIES,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
   category: string;
   onCategoryChange: (id: string) => void;
+  /** Dynamic categories from admin (first item should be "All Resources" with id "all"). */
+  categoryOptions?: { id: string; label: string }[];
 }) {
   return (
     <section
@@ -50,7 +60,7 @@ export function CoursesHero({
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          {COURSE_CATEGORIES.map(({ id, label }) => (
+          {categoryOptions.map(({ id, label }) => (
             <Button
               key={id}
               variant={category === id ? "default" : "outline"}

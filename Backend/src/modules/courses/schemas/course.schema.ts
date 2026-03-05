@@ -44,11 +44,8 @@ export class Course {
   @Prop()
   lessons?: number;
 
-  @Prop({ enum: ['draft', 'published'], default: 'draft' })
+  @Prop({ enum: ['draft', 'published'], default: 'published' })
   status?: 'draft' | 'published';
-
-  @Prop({ enum: ['public', 'private'], default: 'private' })
-  visibility?: 'public' | 'private';
 
   @Prop()
   enableEnrollment?: boolean;

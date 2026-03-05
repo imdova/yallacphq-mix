@@ -13,6 +13,7 @@ export const userSchema = z.object({
   course: z.string().optional(),
   country: z.string().optional(),
   speciality: z.string().optional(),
+  profileImageUrl: z.string().url().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -90,6 +91,7 @@ export const updateCurrentUserBodySchema = z
     course: z.string().optional(),
     country: z.string().optional(),
     speciality: z.string().optional(),
+    profileImageUrl: z.string().url().optional(),
   })
   .partial();
 

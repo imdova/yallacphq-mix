@@ -21,6 +21,7 @@ import {
   ArrowLeft,
   Shield,
   Sparkles,
+  ShoppingCart,
 } from "lucide-react";
 import { CourseCard } from "@/components/features/courses/CourseCard";
 import { enrollCourse, getPublicCourse, getPublicCourses } from "@/lib/dal/courses";
@@ -29,6 +30,7 @@ import { ROUTES } from "@/constants";
 import type { Course } from "@/types/course";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
+import { useCart } from "@/contexts/cart-context";
 import { getErrorMessage } from "@/lib/api/error";
 
 const COURSE_INCLUDES = [
@@ -258,6 +260,8 @@ export function CourseDetailsView() {
   const [enrolling, setEnrolling] = React.useState(false);
   const [enrollError, setEnrollError] = React.useState<string | null>(null);
   const [enrollSuccess, setEnrollSuccess] = React.useState(false);
+  const { addToCart, isInCart } = useCart();
+  const inCart = courseId ? isInCart(courseId) : false;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -404,6 +408,32 @@ export function CourseDetailsView() {
             <Button asChild variant="ghost" size="sm" className="hidden text-zinc-600 sm:inline-flex">
               <Link href="/#contact">Contact</Link>
             </Button>
+            {status === "authenticated" && inCart ? (
+              <Button asChild variant="outline" size="sm" className="rounded-lg border-emerald-300 bg-emerald-50 text-emerald-700">
+                <Link href="/cart">
+                  <Check className="mr-1.5 h-4 w-4" />
+                  In cart
+                </Link>
+              </Button>
+            ) : status === "authenticated" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-lg border-zinc-200"
+                onClick={() => courseId && void addToCart(courseId)}
+              >
+                <ShoppingCart className="mr-1.5 h-4 w-4" />
+                Add to cart
+              </Button>
+            ) : (
+              <Button asChild variant="outline" size="sm" className="rounded-lg border-zinc-200">
+                <Link href={`/auth/login?next=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : "/courses")}`}>
+                  <ShoppingCart className="mr-1.5 h-4 w-4" />
+                  Add to cart
+                </Link>
+              </Button>
+            )}
             <Button
               size="sm"
               className="rounded-lg bg-gold px-3 font-semibold text-gold-foreground hover:bg-gold/90 sm:px-4"
@@ -483,6 +513,31 @@ export function CourseDetailsView() {
               <YouTubePreviewPlayer videoId="9JJYT8ajOKg" />
             </div>
             <div className="flex w-full min-w-0 max-w-full flex-col gap-3 sm:max-w-md sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3 lg:max-w-[400px] lg:justify-end">
+              {status === "authenticated" && inCart ? (
+                <Button asChild variant="outline" className="w-full rounded-xl border-emerald-300 bg-emerald-50/20 text-white hover:bg-emerald-50/30 sm:w-auto">
+                  <Link href="/cart">
+                    <Check className="mr-2 h-4 w-4" />
+                    In cart
+                  </Link>
+                </Button>
+              ) : status === "authenticated" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-xl border-white/25 bg-white/5 text-white hover:bg-white/10 sm:w-auto"
+                  onClick={() => courseId && void addToCart(courseId)}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Add to cart
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="w-full rounded-xl border-white/25 bg-white/5 text-white hover:bg-white/10 sm:w-auto">
+                  <Link href={`/auth/login?next=${encodeURIComponent("/course-details?course=" + (courseId ?? ""))}`}>
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Add to cart
+                  </Link>
+                </Button>
+              )}
               <Button
                 asChild
                 className="w-full rounded-xl bg-gold px-5 py-5 text-base font-semibold text-gold-foreground shadow-lg shadow-gold/20 hover:bg-gold/90 sm:w-auto sm:px-6 sm:py-6"

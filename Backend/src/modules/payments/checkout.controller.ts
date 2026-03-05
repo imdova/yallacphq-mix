@@ -20,6 +20,7 @@ import { toApiOrder } from '../orders/order.mapper';
 import { UsersService } from '../users/users.service';
 import { CoursesService } from '../courses/courses.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
+import { PaypalCaptureService } from './paypal-capture.service';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -43,6 +44,7 @@ export class CheckoutController {
     private readonly users: UsersService,
     private readonly courses: CoursesService,
     private readonly promoCodes: PromoCodesService,
+    private readonly paypalCapture: PaypalCaptureService,
   ) {}
 
   @Post('session')
@@ -111,6 +113,13 @@ export class CheckoutController {
   @ApiBody({ type: ConfirmPaymentBodyDto })
   @ApiOkResponse({ type: ConfirmPaymentResponseDto })
   async confirm(@Body() body: ConfirmPaymentBody) {
+    const order = await this.orders.findById(body.orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    if (body.transactionId && order.provider !== 'manual') {
+      await this.paypalCapture.captureOrder(body.transactionId);
+    }
     const updated = await this.orders.updateStatus({
       orderId: body.orderId,
       status: body.status ?? 'paid',

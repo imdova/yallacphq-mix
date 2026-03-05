@@ -114,7 +114,7 @@ export function AdminOrdersView() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState<StatusFilter>("all");
   const [provider, setProvider] = React.useState<ProviderFilter>("all");
-  const [range, setRange] = React.useState<"7d" | "30d" | "all">("30d");
+  const [range, setRange] = React.useState<"7d" | "30d" | "all">("all");
 
   const [detailsOrder, setDetailsOrder] = React.useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = React.useState(false);
@@ -241,7 +241,6 @@ export function AdminOrdersView() {
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="truncate text-sm text-zinc-500">{o.transactionId ?? "—"}</div>
             </div>
           );
         },
@@ -329,6 +328,43 @@ export function AdminOrdersView() {
             <div className="text-sm text-zinc-700">
               <div className="font-medium text-zinc-800">{o.provider}</div>
               <div className="text-xs text-zinc-500">{o.paymentMethod ?? "—"}</div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "transaction",
+        header: "Transaction",
+        cell: ({ row }) => {
+          const o = row.original;
+          const tid = o.transactionId?.trim();
+          return (
+            <div className="min-w-0 max-w-[180px]">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium text-zinc-800" title={tid || undefined}>
+                  {tid || "—"}
+                </span>
+                {tid ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-6 w-6 shrink-0 rounded border-zinc-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void copyText(tid);
+                    }}
+                    aria-label="Copy transaction ID"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                ) : null}
+              </div>
+              {o.paidAt ? (
+                <div className="text-xs text-zinc-500 mt-0.5" title={o.paidAt}>
+                  Paid {formatDate(o.paidAt)}
+                </div>
+              ) : null}
             </div>
           );
         },
@@ -496,12 +532,12 @@ export function AdminOrdersView() {
               <div className="text-xs font-semibold text-zinc-600">Date range</div>
               <Select value={range} onValueChange={(v) => setRange(v as typeof range)}>
                 <SelectTrigger className="h-10 rounded-xl border-zinc-200 bg-white">
-                  <SelectValue placeholder="30 days" />
+                  <SelectValue placeholder="All time" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All time</SelectItem>
                   <SelectItem value="7d">Last 7 days</SelectItem>
                   <SelectItem value="30d">Last 30 days</SelectItem>
-                  <SelectItem value="all">All time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -524,6 +560,8 @@ export function AdminOrdersView() {
                     provider: o.provider,
                     paymentMethod: o.paymentMethod ?? "",
                     transactionId: o.transactionId ?? "",
+                    paidAt: o.paidAt ?? "",
+                    refundedAt: o.refundedAt ?? "",
                     createdAt: o.createdAt,
                   }));
                   downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`, rows);
@@ -565,7 +603,7 @@ export function AdminOrdersView() {
                   setQuery("");
                   setStatus("all");
                   setProvider("all");
-                  setRange("30d");
+                  setRange("all");
                 }}
               >
                 Clear filters

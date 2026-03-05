@@ -12,10 +12,13 @@ const ALLOWED_IMAGE_TYPES = new Set([
   'image/webp',
 ]);
 
+const ALLOWED_PDF_TYPE = 'application/pdf';
+
 const COURSE_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
+const BANK_TRANSFER_MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
-export type UploadType = 'course-image' | 'profile-image';
+export type UploadType = 'course-image' | 'profile-image' | 'bank-transfer';
 
 @Injectable()
 export class UploadService {
@@ -25,12 +28,8 @@ export class UploadService {
 
   constructor(private readonly config: ConfigService) {
     const region = this.config.get<string>('AWS_REGION');
-    const accessKey =
-      this.config.get<string>('AWS_ACCESS_KEY') ??
-      this.config.get<string>('AWS_ACCESS_KEY_ID');
-    const secretKey =
-      this.config.get<string>('AWS_SECRET_KEY') ??
-      this.config.get<string>('AWS_SECRET_ACCESS_KEY');
+    const accessKey = this.config.get<string>('AWS_ACCESS_KEY');
+    const secretKey = this.config.get<string>('AWS_SECRET_KEY');
     const bucket = this.config.get<string>('AWS_BUCKET_NAME');
     if (region && accessKey && secretKey && bucket) {
       this.region = region;
@@ -58,6 +57,7 @@ export class UploadService {
       'image/png': 'png',
       'image/gif': 'gif',
       'image/webp': 'webp',
+      'application/pdf': 'pdf',
     };
     return map[mimetype?.toLowerCase()] ?? 'jpg';
   }
@@ -68,14 +68,25 @@ export class UploadService {
     userId?: string,
   ): Promise<{ url: string }> {
     const mimetype = (file.mimetype ?? '').toLowerCase();
-    if (!ALLOWED_IMAGE_TYPES.has(mimetype)) {
+    const isBankTransfer = type === 'bank-transfer';
+    if (isBankTransfer) {
+      if (!ALLOWED_IMAGE_TYPES.has(mimetype) && mimetype !== ALLOWED_PDF_TYPE) {
+        throw new BadRequestException(
+          'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, PDF.',
+        );
+      }
+    } else if (!ALLOWED_IMAGE_TYPES.has(mimetype)) {
       throw new BadRequestException(
         'Invalid file type. Allowed: JPEG, PNG, GIF, WebP.',
       );
     }
 
     const maxBytes =
-      type === 'course-image' ? COURSE_IMAGE_MAX_BYTES : PROFILE_IMAGE_MAX_BYTES;
+      type === 'course-image'
+        ? COURSE_IMAGE_MAX_BYTES
+        : type === 'profile-image'
+          ? PROFILE_IMAGE_MAX_BYTES
+          : BANK_TRANSFER_MAX_BYTES;
     if (file.buffer.length > maxBytes) {
       const maxMB = maxBytes / (1024 * 1024);
       throw new BadRequestException(
@@ -89,6 +100,9 @@ export class UploadService {
     if (type === 'profile-image') {
       const uid = userId ?? uuid;
       key = `profile/${uid}/${uuid}.${ext}`;
+    } else if (type === 'bank-transfer') {
+      const uid = userId ?? uuid;
+      key = `bank-transfers/${uid}/${uuid}.${ext}`;
     } else {
       key = `courses/${uuid}.${ext}`;
     }

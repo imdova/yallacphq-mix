@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CourseCard } from "@/components/features/courses/CourseCard";
 import { Button } from "@/components/ui/button";
-import { fetchCourses } from "@/lib/dal/courses";
+import { getPublicCourses } from "@/lib/dal/courses";
 import type { Course } from "@/types/course";
 import { ArrowRight } from "lucide-react";
 
@@ -18,7 +18,7 @@ export function CoursesSection() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await fetchCourses();
+        const data = await getPublicCourses();
         if (!cancelled) setCourses(data.slice(0, DISPLAY_COUNT));
       } finally {
         if (!cancelled) setLoading(false);

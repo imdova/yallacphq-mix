@@ -13,6 +13,8 @@ export const createPaymentSessionBodySchema = z.object({
   idempotencyKey: z.string().min(8).optional(),
   /** Course IDs to enroll the user in after payment (cart checkout). */
   courseIds: z.array(z.string().min(1)).optional(),
+  /** URL of uploaded bank transfer receipt (when method is bank). */
+  bankTransferProofUrl: z.string().optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<

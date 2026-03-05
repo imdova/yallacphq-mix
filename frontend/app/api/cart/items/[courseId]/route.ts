@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ courseId: string }> }
+  { params }: { params: { courseId: string } }
 ) {
   const requestId = getRequestIdFromRequest(req) ?? newRequestId();
-  const { courseId } = await params();
+  const { courseId } = params;
 
   if (!isBackendConfigured()) {
     return NextResponse.json(

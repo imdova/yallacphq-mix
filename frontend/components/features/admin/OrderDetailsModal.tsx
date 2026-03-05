@@ -112,6 +112,17 @@ export function OrderDetailsModal({
                 <div className="mt-0.5 text-sm text-zinc-600">
                   Provider: {order.provider} · Method: {order.paymentMethod ?? "—"}
                 </div>
+                {order.provider === "manual" && order.bankTransferProofUrl ? (
+                  <a
+                    href={order.bankTransferProofUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-gold hover:underline"
+                  >
+                    View bank transfer receipt
+                    <span aria-hidden>↗</span>
+                  </a>
+                ) : null}
               </div>
             </div>
 

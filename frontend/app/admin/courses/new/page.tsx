@@ -125,6 +125,8 @@ function courseToFormValues(course: Course): FormValues {
     discountPercent: course.discountPercent ?? 0,
     level: course.level ?? "Intermediate",
     enrolledCount: course.enrolledCount ?? 0,
+    rating: course.rating ?? 0,
+    reviewCount: course.reviewCount ?? 0,
     lessons: course.lessons ?? 0,
     seoTitle: course.seoTitle ?? "",
     seoDescription: course.seoDescription ?? "",
@@ -197,6 +199,8 @@ export default function AdminCourseNewPage() {
       discountPercent: 0,
       level: "Intermediate",
       enrolledCount: 0,
+      rating: 4.8,
+      reviewCount: 0,
       lessons: 0,
       seoTitle: "",
       seoDescription: "",
@@ -434,6 +438,8 @@ export default function AdminCourseNewPage() {
       discountPercent: data.discountPercent,
       level: data.level,
       enrolledCount: data.enrolledCount ?? 0,
+      rating: data.rating,
+      reviewCount: data.reviewCount,
       lessons: data.lessons,
       imageUrl: data.imageUrl?.trim() || undefined,
       instructorImageUrl: data.instructorImageUrl?.trim() || undefined,
@@ -789,6 +795,48 @@ export default function AdminCourseNewPage() {
                           className="rounded-xl border-zinc-200"
                           {...rest}
                         />
+                      )}
+                    </FormField>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField name="rating" label="Fake Rating (0–5)">
+                      {({ id, error, ...rest }) => (
+                        <div className="space-y-1.5">
+                          <FormInput
+                            id={id}
+                            error={error}
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="5"
+                            placeholder="e.g. 4.8"
+                            className="rounded-xl border-zinc-200"
+                            {...rest}
+                          />
+                          <p className="text-xs text-zinc-500">
+                            Shown to students as course rating (stars).
+                          </p>
+                        </div>
+                      )}
+                    </FormField>
+                    <FormField name="reviewCount" label="Fake Reviews">
+                      {({ id, error, ...rest }) => (
+                        <div className="space-y-1.5">
+                          <FormInput
+                            id={id}
+                            error={error}
+                            type="number"
+                            step="1"
+                            min="0"
+                            placeholder="e.g. 128"
+                            className="rounded-xl border-zinc-200"
+                            {...rest}
+                          />
+                          <p className="text-xs text-zinc-500">
+                            Shown to students as number of reviews.
+                          </p>
+                        </div>
                       )}
                     </FormField>
                   </div>

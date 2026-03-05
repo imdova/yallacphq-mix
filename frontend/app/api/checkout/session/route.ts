@@ -113,6 +113,8 @@ export async function POST(req: Request) {
       provider,
       paymentMethod: body.method === "bank" ? "cash" : "card",
       status: "pending",
+      courseIds: body.courseIds?.length ? body.courseIds : undefined,
+      bankTransferProofUrl: body.bankTransferProofUrl,
     });
 
     const sessionId = crypto.randomUUID();

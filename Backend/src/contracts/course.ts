@@ -81,6 +81,8 @@ export const createCourseBodySchema = z.object({
   certificationType: z
     .enum(['CPHQ Prep', 'CME Credits', 'Micro-Credential'])
     .optional(),
+  rating: z.number().min(0).max(5).optional(),
+  reviewCount: z.number().int().min(0).optional(),
   enrolledCount: z.number().optional(),
   lessons: z.number().optional(),
   imagePlaceholder: z.string().optional(),

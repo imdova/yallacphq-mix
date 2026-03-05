@@ -1,4 +1,7 @@
+import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Star, Clock, Users, ShoppingCart, BookOpen, Check } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +11,8 @@ import type { Course } from "@/types/course";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/contexts/auth-context";
+import { enrollCourse } from "@/lib/dal/courses";
+import { getErrorMessage } from "@/lib/api/error";
 
 function formatPrice(value: number): string {
   if (value === 0) return "Free";
@@ -15,23 +20,56 @@ function formatPrice(value: number): string {
 }
 
 export function CourseCard({ course }: { course: Course }) {
+  const router = useRouter();
   const { addToCart, isInCart } = useCart();
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const inCart = isInCart(course.id);
   const detailsHref = `${ROUTES.COURSE_DETAILS}?course=${encodeURIComponent(course.id)}`;
   const tagStyle = TAG_STYLES[course.tag] ?? "bg-zinc-600 text-white";
   const hasSale = course.priceSale != null && course.priceSale > 0 && (course.priceRegular ?? 0) > (course.priceSale ?? 0);
   const displayPrice = hasSale ? course.priceSale! : (course.priceRegular ?? 0);
+  const isFree = displayPrice === 0;
   const lessonsCount = course.lessons ?? Math.max(1, Math.round(course.durationHours * 4));
+  const [enrolling, setEnrolling] = React.useState(false);
+  const [enrollError, setEnrollError] = React.useState<string | null>(null);
+
+  const handleEnrollFree = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (status !== "authenticated" || !user) {
+      router.push(`/auth/login?next=${encodeURIComponent(detailsHref)}`);
+      return;
+    }
+    setEnrollError(null);
+    setEnrolling(true);
+    try {
+      await enrollCourse(course.id, user.id);
+      router.push("/dashboard/courses");
+    } catch (err) {
+      setEnrollError(getErrorMessage(err, "Failed to enroll"));
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   return (
     <Card className="group flex flex-col overflow-hidden rounded-2xl border-zinc-200 bg-white shadow-sm transition-all hover:border-zinc-300 hover:shadow-md">
       <Link href={detailsHref} className="block">
         <div className="relative aspect-video w-full overflow-hidden bg-zinc-200">
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-zinc-300 to-zinc-400 transition-transform duration-300 group-hover:scale-105"
-            aria-hidden
-          />
+          {course.imageUrl ? (
+            <Image
+              src={course.imageUrl}
+              alt=""
+              fill
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            />
+          ) : (
+            <div
+              className="absolute inset-0 bg-gradient-to-br from-zinc-300 to-zinc-400 transition-transform duration-300 group-hover:scale-105"
+              aria-hidden
+            />
+          )}
           <span
             className={cn(
               "absolute left-3 top-3 rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wide shadow-sm",
@@ -66,7 +104,19 @@ export function CourseCard({ course }: { course: Course }) {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col pt-0">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-200" aria-hidden />
+          {course.instructorImageUrl ? (
+            <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-zinc-200">
+              <Image
+                src={course.instructorImageUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="32px"
+              />
+            </div>
+          ) : (
+            <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-200" aria-hidden />
+          )}
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-zinc-900">{course.instructorName}</p>
             <p className="truncate text-xs text-zinc-500">{course.instructorTitle}</p>
@@ -106,7 +156,32 @@ export function CourseCard({ course }: { course: Course }) {
           >
             <Link href={detailsHref}>View Details</Link>
           </Button>
-          {status === "authenticated" ? (
+          {isFree ? (
+            status === "authenticated" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-xl border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                onClick={handleEnrollFree}
+                disabled={enrolling}
+              >
+                {enrolling ? "Enrolling…" : "Enroll for free"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-xl border-zinc-200"
+                asChild
+              >
+                <Link href={`/auth/login?next=${encodeURIComponent(detailsHref)}`}>
+                  Enroll for free
+                </Link>
+              </Button>
+            )
+          ) : status === "authenticated" ? (
             inCart ? (
               <Button
                 type="button"
@@ -147,6 +222,9 @@ export function CourseCard({ course }: { course: Course }) {
             </Button>
           )}
         </div>
+        {enrollError ? (
+          <p className="mt-2 text-xs text-rose-600">{enrollError}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

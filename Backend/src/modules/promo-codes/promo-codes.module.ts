@@ -17,5 +17,6 @@ import { PromoCode, PromoCodeSchema } from './schemas/promo-code.schema';
   ],
   controllers: [PromoCodesController, AdminPromoCodesController],
   providers: [PromoCodesService],
+  exports: [PromoCodesService],
 })
 export class PromoCodesModule {}

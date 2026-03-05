@@ -34,12 +34,13 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/constants";
 import { cn } from "@/lib/utils";
-import { createPaymentSession } from "@/lib/dal/orders";
+import { createPaymentSession, confirmPayment } from "@/lib/dal/orders";
 import { getErrorMessage } from "@/lib/api/error";
 import { useAuth } from "@/contexts/auth-context";
 import { useCart } from "@/contexts/cart-context";
 import { validatePromoCode } from "@/lib/dal/promo-codes";
 import { getPublicCourse } from "@/lib/dal/courses";
+import { uploadBankTransferProof } from "@/lib/dal/upload";
 import type { Course } from "@/types/course";
 
 const FLAG_CDN = "https://flagcdn.com";
@@ -121,6 +122,7 @@ export function CheckoutView() {
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const receiptInputRef = React.useRef<HTMLInputElement>(null);
+  const pendingPayPalOrderRef = React.useRef<{ id: string } | null>(null);
 
   React.useEffect(() => {
     if (courseIds.length === 0) {
@@ -190,25 +192,38 @@ export function CheckoutView() {
             _data: unknown,
             actions: { order: { create: (opts: unknown) => Promise<{ id: string }> } }
           ) {
-            return actions.order
-              .create({
+            const payload = checkoutPayloadRef.current;
+            return createPaymentSession({
+              method: "paypal",
+              courseTitle: payload.courseTitle,
+              currency: "USD",
+              amount: payload.total,
+              discountAmount: payload.discountAmount || undefined,
+              promoCode: payload.promoCode || undefined,
+              idempotencyKey: crypto.randomUUID(),
+              courseIds: payload.courseIds?.length ? payload.courseIds : undefined,
+            }).then((res) => {
+              pendingPayPalOrderRef.current = res.order;
+              return actions.order.create({
                 purchase_units: [
                   {
-                    description: "CPHQ PLUS DIPLOMA IN HEALTHCARE QUALITY 450",
-                    amount: { currency_code: "USD", value: "450" },
+                    description: payload.courseTitle,
+                    amount: { currency_code: "USD", value: payload.total.toFixed(2) },
                   },
                 ],
-              })
-              .then((order) => order.id);
+              });
+            }).then((order) => order.id);
           },
-          onApprove: function (_data: unknown, actions: { order: { capture: () => Promise<unknown> } }) {
-            return actions.order.capture().then(function () {
-              const element = document.getElementById("paypal-button-container");
-              if (element) {
-                element.innerHTML = "";
-                element.innerHTML =
-                  '<h3 class="text-lg font-semibold text-green-600">Thank you for your payment!</h3>';
+          onApprove: function (
+            data: { orderID: string },
+            actions: { order: { capture: () => Promise<unknown> } }
+          ) {
+            return actions.order.capture().then(async () => {
+              const order = pendingPayPalOrderRef.current;
+              if (order) {
+                await confirmPayment({ orderId: order.id, transactionId: data.orderID });
               }
+              router.push("/dashboard/courses");
             });
           },
           onError: function (err: unknown) {
@@ -268,11 +283,29 @@ export function CheckoutView() {
     </button>
   );
 
+  const checkoutPayloadRef = React.useRef({
+    total: 0,
+    courseTitle: PRODUCT.name,
+    courseIds: [] as string[],
+    discountAmount: 0,
+    promoCode: "",
+  });
+
   const subtotal = cartCourses.length > 0 ? cartTotal : PRODUCT.price;
   const upsellTotal = addUpsell ? UPSELL.price : 0;
   const preDiscountTotal = subtotal + upsellTotal;
   const total = Math.max(0, preDiscountTotal - discountAmount);
   const useCartCheckout = cartCourses.length > 0;
+
+  React.useEffect(() => {
+    checkoutPayloadRef.current = {
+      total,
+      courseTitle: useCartCheckout ? `${cartCourses.length} course(s) from Yalla CPHQ` : PRODUCT.name,
+      courseIds: useCartCheckout ? courseIds : [],
+      discountAmount,
+      promoCode: discountCode.trim(),
+    };
+  }, [total, useCartCheckout, cartCourses.length, courseIds, discountAmount, discountCode]);
 
   const applyPromo = async () => {
     const code = discountCode.trim();
@@ -285,8 +318,8 @@ export function CheckoutView() {
     setPromoStatus("loading");
     setPromoMessage(null);
     try {
-      // Checkout is currently for a single bundle product. Use a stable courseId placeholder for validation.
-      const res = await validatePromoCode("bundle-cphq", code);
+      const courseIdForPromo = cartCourses.length > 0 ? (cartCourses[0]?.id ?? "bundle-cphq") : "bundle-cphq";
+      const res = await validatePromoCode(courseIdForPromo, code);
       setDiscountAmount(res.discountAmount);
       setPromoStatus("valid");
       setPromoMessage(`Promo applied: -$${res.discountAmount.toFixed(2)}`);
@@ -307,8 +340,17 @@ export function CheckoutView() {
       setCheckoutError("Your cart is empty. Add courses from the catalog.");
       return;
     }
+    if (payment === "bank" && !receiptFile) {
+      setCheckoutError("Please upload your bank transfer receipt to complete the order.");
+      return;
+    }
     setSubmitting(true);
     try {
+      let bankTransferProofUrl: string | undefined;
+      if (payment === "bank" && receiptFile) {
+        const { url } = await uploadBankTransferProof(receiptFile);
+        bankTransferProofUrl = url;
+      }
       await createPaymentSession({
         method: "bank",
         courseTitle: useCartCheckout
@@ -320,6 +362,7 @@ export function CheckoutView() {
         promoCode: discountCode.trim() || undefined,
         idempotencyKey: crypto.randomUUID(),
         ...(useCartCheckout && courseIds.length > 0 ? { courseIds } : undefined),
+        ...(bankTransferProofUrl ? { bankTransferProofUrl } : undefined),
       });
       if (useCartCheckout) {
         await clearCart();
@@ -818,9 +861,9 @@ export function CheckoutView() {
                   <Button
                     className="mt-6 h-12 w-full rounded-xl bg-gold text-base font-semibold text-gold-foreground shadow-md hover:bg-gold/90"
                     onClick={() => void completeBankCheckout()}
-                    disabled={submitting}
+                    disabled={submitting || (payment === "bank" && !receiptFile)}
                   >
-                    {submitting ? "Processing…" : "Complete Purchase"}
+                    {submitting ? "Processing…" : payment === "bank" && !receiptFile ? "Upload receipt to continue" : "Complete Purchase"}
                     <Lock className="h-4 w-4" />
                   </Button>
                 </>

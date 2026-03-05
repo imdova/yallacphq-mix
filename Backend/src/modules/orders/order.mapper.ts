@@ -16,6 +16,8 @@ export function toApiOrder(o: OrderDocument): ApiOrder {
     paymentMethod: o.paymentMethod,
     status: o.status,
     transactionId: o.transactionId,
+    courseIds: o.courseIds,
+    bankTransferProofUrl: o.bankTransferProofUrl,
     createdAt: o.createdAt?.toISOString?.() ?? new Date().toISOString(),
     updatedAt: o.updatedAt?.toISOString?.() ?? new Date().toISOString(),
     paidAt: o.paidAt,

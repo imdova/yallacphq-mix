@@ -146,6 +146,12 @@ export class CreateCourseBodyDto {
   @ApiProperty({ required: false, example: 0, minimum: 0, description: 'Initial enrolled count' })
   enrolledCount?: number;
 
+  @ApiProperty({ required: false, example: 4.8, minimum: 0, maximum: 5, description: 'Display rating (0–5) shown to students' })
+  rating?: number;
+
+  @ApiProperty({ required: false, example: 128, minimum: 0, description: 'Display review count shown to students' })
+  reviewCount?: number;
+
   @ApiProperty({ required: false, example: 24, minimum: 0, description: 'Number of lessons' })
   lessons?: number;
 

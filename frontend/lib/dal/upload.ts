@@ -4,6 +4,7 @@
 
 const UPLOAD_COURSE_IMAGE_URL = "/api/upload/course-image";
 const UPLOAD_PROFILE_IMAGE_URL = "/api/upload/profile-image";
+const UPLOAD_BANK_TRANSFER_URL = "/api/upload/bank-transfer";
 
 export interface UploadResult {
   url: string;
@@ -53,4 +54,9 @@ export async function uploadCourseImage(file: File): Promise<UploadResult> {
 /** Upload a profile/avatar image (authenticated user). Max 2MB. Allowed: JPEG, PNG, GIF, WebP. */
 export async function uploadProfileImage(file: File): Promise<UploadResult> {
   return uploadFile(UPLOAD_PROFILE_IMAGE_URL, file);
+}
+
+/** Upload bank transfer receipt (authenticated user). Max 10MB. Allowed: JPEG, PNG, GIF, WebP, PDF. */
+export async function uploadBankTransferProof(file: File): Promise<UploadResult> {
+  return uploadFile(UPLOAD_BANK_TRANSFER_URL, file);
 }

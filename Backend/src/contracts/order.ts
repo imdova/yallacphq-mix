@@ -24,6 +24,8 @@ export const orderSchema = z.object({
   paymentMethod: paymentMethodSchema.optional(),
   status: orderStatusSchema,
   transactionId: z.string().optional(),
+  courseIds: z.array(z.string()).optional(),
+  bankTransferProofUrl: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   paidAt: z.string().optional(),
@@ -47,6 +49,8 @@ export const createOrderBodySchema = z.object({
   transactionId: z.string().optional(),
   paidAt: z.string().optional(),
   refundedAt: z.string().optional(),
+  courseIds: z.array(z.string().min(1)).optional(),
+  bankTransferProofUrl: z.string().optional(),
 });
 
 export type CreateOrderBody = z.infer<typeof createOrderBodySchema>;

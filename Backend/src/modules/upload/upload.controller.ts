@@ -89,4 +89,36 @@ export class UploadController {
       user.sub,
     );
   }
+
+  @Post('bank-transfer')
+  @Version('1')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  @ApiAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiFileUpload({ fieldName: 'file', required: true })
+  @ApiOperation({ summary: 'Upload bank transfer receipt (authenticated user)' })
+  @ApiOkResponse({ description: 'Returns the public URL of the uploaded file' })
+  async uploadBankTransfer(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: RequestUser,
+  ): Promise<UploadResponse> {
+    if (!file?.buffer) {
+      throw new BadRequestException('No file provided. Send multipart/form-data with field "file".');
+    }
+    return this.upload.upload(
+      'bank-transfer',
+      {
+        buffer: file.buffer,
+        mimetype: file.mimetype ?? 'application/octet-stream',
+        originalname: file.originalname,
+      },
+      user.sub,
+    );
+  }
 }

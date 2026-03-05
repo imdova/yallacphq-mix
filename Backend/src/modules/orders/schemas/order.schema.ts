@@ -63,6 +63,10 @@ export class Order {
   @Prop({ type: [String], default: undefined })
   courseIds?: string[];
 
+  /** URL of uploaded bank transfer receipt (when provider is manual). */
+  @Prop()
+  bankTransferProofUrl?: string;
+
   @Prop()
   paidAt?: string;
 

@@ -309,6 +309,7 @@ export function CourseDetailsView() {
   const priceSale = displayCourse.priceSale;
   const hasSale = priceSale != null && priceSale > 0 && priceRegular > priceSale;
   const displayPrice = hasSale ? priceSale : priceRegular;
+  const isFree = displayPrice === 0;
 
   const onEnroll = async () => {
     if (!courseId) return;
@@ -321,17 +322,25 @@ export function CourseDetailsView() {
       return;
     }
 
-    setEnrolling(true);
-    try {
-      await enrollCourse(courseId, user.id);
-      setEnrollSuccess(true);
-      // keep UI simple: redirect to checkout (existing flow) after success
-      window.setTimeout(() => router.push(ROUTES.CHECKOUT), 600);
-    } catch (e) {
-      setEnrollError(getErrorMessage(e, "Failed to enroll"));
-    } finally {
-      setEnrolling(false);
+    if (isFree) {
+      setEnrolling(true);
+      try {
+        await enrollCourse(courseId, user.id);
+        setEnrollSuccess(true);
+        window.setTimeout(() => router.push("/dashboard/courses"), 600);
+      } catch (e) {
+        setEnrollError(getErrorMessage(e, "Failed to enroll"));
+      } finally {
+        setEnrolling(false);
+      }
+      return;
     }
+
+    setEnrolling(true);
+    addToCart(courseId)
+      .then(() => router.push(ROUTES.CHECKOUT))
+      .catch((e) => setEnrollError(getErrorMessage(e, "Failed to add to cart")))
+      .finally(() => setEnrolling(false));
   };
 
   if (loading && !course && courseId) {
@@ -440,7 +449,7 @@ export function CourseDetailsView() {
               onClick={() => void onEnroll()}
               disabled={enrolling}
             >
-              {enrolling ? "Enrolling…" : "Enroll Now"}
+              {enrolling ? (isFree ? "Enrolling…" : "Adding…") : isFree ? "Enroll for free" : inCart ? "Proceed to checkout" : "Enroll Now"}
             </Button>
           </div>
         </div>
@@ -539,10 +548,12 @@ export function CourseDetailsView() {
                 </Button>
               )}
               <Button
-                asChild
+                type="button"
                 className="w-full rounded-xl bg-gold px-5 py-5 text-base font-semibold text-gold-foreground shadow-lg shadow-gold/20 hover:bg-gold/90 sm:w-auto sm:px-6 sm:py-6"
+                onClick={() => void onEnroll()}
+                disabled={enrolling}
               >
-                <Link href={ROUTES.CHECKOUT}>Enroll Now</Link>
+                {enrolling ? (isFree ? "Enrolling…" : "Adding…") : isFree ? "Enroll for free" : inCart ? "Proceed to checkout" : "Enroll Now"}
               </Button>
               <Button
                 asChild

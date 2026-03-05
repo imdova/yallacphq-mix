@@ -18,6 +18,7 @@ import { OrdersService } from '../orders/orders.service';
 import { toApiOrder } from '../orders/order.mapper';
 import { UsersService } from '../users/users.service';
 import { CoursesService } from '../courses/courses.service';
+import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -40,6 +41,7 @@ export class CheckoutController {
     private readonly orders: OrdersService,
     private readonly users: UsersService,
     private readonly courses: CoursesService,
+    private readonly promoCodes: PromoCodesService,
   ) {}
 
   @Post('session')
@@ -55,6 +57,7 @@ export class CheckoutController {
     @CurrentUser() jwtUser: RequestUser,
   ) {
     const dbUser = await this.users.findById(jwtUser.sub);
+    const isBank = body.method === 'bank';
     const order = await this.orders.createPending({
       studentName: dbUser?.name ?? 'Student',
       studentEmail: dbUser?.email ?? jwtUser.email,
@@ -64,9 +67,11 @@ export class CheckoutController {
       amount: body.amount,
       discountAmount: body.discountAmount,
       promoCode: body.promoCode,
-      provider: 'stripe',
+      provider: isBank ? 'manual' : 'stripe',
+      paymentMethod: isBank ? 'cash' : 'card',
       userId: jwtUser.sub,
       courseIds: body.courseIds?.length ? body.courseIds : undefined,
+      bankTransferProofUrl: body.bankTransferProofUrl,
     });
 
     return {
@@ -92,6 +97,9 @@ export class CheckoutController {
     });
     if (!updated) {
       throw new Error('Order not found');
+    }
+    if (updated.status === 'paid' && updated.promoCode?.trim()) {
+      await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());
     }
     if (
       updated.status === 'paid' &&

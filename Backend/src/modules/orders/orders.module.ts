@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CommonModule } from '../../common/common.module';
+import { CoursesModule } from '../courses/courses.module';
+import { PromoCodesModule } from '../promo-codes/promo-codes.module';
+import { UsersModule } from '../users/users.module';
 import { OrdersController } from './orders.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { OrdersService } from './orders.service';
@@ -10,6 +13,9 @@ import { Order, OrderSchema } from './schemas/order.schema';
   imports: [
     CommonModule,
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
+    UsersModule,
+    CoursesModule,
+    PromoCodesModule,
   ],
   controllers: [OrdersController, AdminOrdersController],
   providers: [OrdersService],

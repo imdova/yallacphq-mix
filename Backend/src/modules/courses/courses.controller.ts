@@ -1,15 +1,16 @@
 import {
-  Body,
+  BadRequestException,
   Controller,
   Get,
   ForbiddenException,
   NotFoundException,
   Param,
   Post,
+  Req,
   UseGuards,
-  UsePipes,
   Version,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { RequestUser } from '../../common/auth/current-user.decorator';
 import { Role } from '../../common/auth/role';
@@ -23,7 +24,6 @@ import {
 import { ApiAuth } from '../../common/swagger/decorators/api-auth.decorator';
 import { ApiCourseEndpoints } from '../../common/swagger/decorators/api-course-endpoints.decorator';
 import { PublicCoursesResponseDto } from '../../contracts/dtos';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   enrollCourseBodySchema,
   enrollCourseResponseSchema,
@@ -86,7 +86,6 @@ export class CoursesController {
   @Post(':id/enroll')
   @Version('1')
   @UseGuards(JwtAuthGuard)
-  @UsePipes(new ZodValidationPipe(enrollCourseBodySchema))
   @ResponseSchema(enrollCourseResponseSchema)
   @ApiOperation({ summary: 'Enroll in course' })
   @ApiAuth()
@@ -94,9 +93,30 @@ export class CoursesController {
   @ApiBody({ schema: { example: {} } })
   async enroll(
     @Param('id') courseId: string,
-    @Body() body: EnrollCourseBody,
+    @Req() req: Request,
     @CurrentUser() user: RequestUser,
   ) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = rawBody.trim() ? (JSON.parse(rawBody) as unknown) : {};
+      } catch {
+        rawBody = {};
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      rawBody = {};
+    }
+    const parsed = enrollCourseBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const body: EnrollCourseBody = parsed.data;
+
     const course = await this.courses.findById(courseId);
     if (!course) throw new NotFoundException('Course not found');
 

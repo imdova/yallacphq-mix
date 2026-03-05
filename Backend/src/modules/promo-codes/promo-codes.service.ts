@@ -51,4 +51,14 @@ export class PromoCodesService {
   deleteById(id: string) {
     return this.promoModel.findByIdAndDelete(id).exec();
   }
+
+  async incrementUsageByCode(code: string) {
+    const promo = await this.promoModel
+      .findOne({ code: code.trim().toUpperCase() })
+      .exec();
+    if (!promo) return;
+    await this.promoModel
+      .findByIdAndUpdate(promo.id, { $inc: { usageCount: 1 } })
+      .exec();
+  }
 }

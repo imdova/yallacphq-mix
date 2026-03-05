@@ -126,6 +126,8 @@ export async function createOrder(data: CreateOrderInput): Promise<Order> {
     paymentMethod: data.paymentMethod,
     status: data.status ?? "pending",
     transactionId: data.transactionId,
+    courseIds: data.courseIds,
+    bankTransferProofUrl: data.bankTransferProofUrl,
     createdAt: now,
     updatedAt: now,
     paidAt: data.paidAt,

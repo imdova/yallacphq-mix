@@ -6,6 +6,7 @@ import {
   OrderDocument,
   type OrderStatus,
   type PaymentProvider,
+  type PaymentMethod,
 } from './schemas/order.schema';
 import type { CreateOrderBody, UpdateOrderBody } from '../../contracts';
 
@@ -19,8 +20,10 @@ export type CreatePendingOrderParams = {
   discountAmount?: number;
   promoCode?: string;
   provider: PaymentProvider;
+  paymentMethod?: PaymentMethod;
   userId?: string;
   courseIds?: string[];
+  bankTransferProofUrl?: string;
 };
 
 @Injectable()
@@ -33,6 +36,7 @@ export class OrdersService {
     return this.orderModel.create({
       ...params,
       status: 'pending',
+      paymentMethod: params.paymentMethod ?? (params.provider === 'manual' ? 'cash' : undefined),
     });
   }
 
@@ -67,6 +71,8 @@ export class OrdersService {
       transactionId: body.transactionId,
       paidAt: body.paidAt,
       refundedAt: body.refundedAt,
+      courseIds: body.courseIds,
+      bankTransferProofUrl: body.bankTransferProofUrl,
     });
   }
 

@@ -31,6 +31,12 @@ export class CreatePaymentSessionBodyDto {
 
   @ApiProperty({ required: false, minLength: 8, example: 'idem_12345678' })
   idempotencyKey?: string;
+
+  @ApiProperty({ required: false, type: [String], example: ['course-id-1'] })
+  courseIds?: string[];
+
+  @ApiProperty({ required: false, example: 'https://bucket.s3.region.amazonaws.com/bank-transfers/xxx.pdf' })
+  bankTransferProofUrl?: string;
 }
 
 export class CreatePaymentSessionResponseDto {

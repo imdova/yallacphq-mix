@@ -59,6 +59,12 @@ export class ApiOrderDto {
   @ApiProperty({ required: false, example: 'txn_123' })
   transactionId?: string;
 
+  @ApiProperty({ required: false, type: [String], example: ['course-id-1'] })
+  courseIds?: string[];
+
+  @ApiProperty({ required: false, example: 'https://bucket.s3.region.amazonaws.com/bank-transfers/xxx.pdf' })
+  bankTransferProofUrl?: string;
+
   @ApiProperty({ example: '2026-03-03T12:34:56.000Z' })
   createdAt!: string;
 

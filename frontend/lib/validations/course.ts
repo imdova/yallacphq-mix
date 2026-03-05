@@ -31,6 +31,8 @@ const baseCourseSchema = z.object({
   discountPercent: z.coerce.number().min(0, "Discount must be 0 or more").max(100, "Discount must be 100 or less").optional(),
   level: z.enum(["Beginner", "Intermediate", "Advanced"]).optional(),
   certificationType: z.enum(["CPHQ Prep", "CME Credits", "Micro-Credential"]).optional(),
+  rating: z.coerce.number().min(0, "Rating must be 0 or more").max(5, "Rating must be 5 or less").optional(),
+  reviewCount: z.coerce.number().int().min(0, "Review count must be 0 or more").optional(),
   enrolledCount: z.coerce.number().int().min(0, "Enrolled must be 0 or more").optional(),
   lessons: z.coerce.number().int().min(0, "Lessons must be 0 or more").optional(),
   imagePlaceholder: z.string().max(240).optional(),

@@ -37,11 +37,19 @@ import { ApiOkDto, ListOrdersResponseDto } from '../../contracts/dtos';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { toApiOrder } from './order.mapper';
 import { OrdersService } from './orders.service';
+import { UsersService } from '../users/users.service';
+import { CoursesService } from '../courses/courses.service';
+import { PromoCodesService } from '../promo-codes/promo-codes.service';
 
 @ApiTags('admin')
 @Controller('admin/orders')
 export class AdminOrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly users: UsersService,
+    private readonly courses: CoursesService,
+    private readonly promoCodes: PromoCodesService,
+  ) {}
 
   @Get()
   @Version('1')
@@ -118,8 +126,28 @@ export class AdminOrdersController {
   @ApiOperation({ summary: 'Admin: update order' })
   @ApiAuth()
   async update(@Param('id') id: string, @Body() body: UpdateOrderBody) {
-    const updated = await this.orders.updateById(id, body);
+    const patch: UpdateOrderBody = { ...body };
+    if (body.status === 'paid') {
+      (patch as Record<string, unknown>).paidAt = new Date().toISOString();
+    }
+    const updated = await this.orders.updateById(id, patch);
     if (!updated) throw new NotFoundException('Order not found');
+    if (body.status === 'paid' && updated.status === 'paid') {
+      if (updated.promoCode?.trim()) {
+        await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());
+      }
+      if (updated.userId && updated.courseIds?.length) {
+        for (const courseId of updated.courseIds) {
+          const newlyAdded = await this.users.addEnrolledCourse(
+            updated.userId,
+            courseId,
+          );
+          if (newlyAdded) {
+            await this.courses.incrementEnrolledCount(courseId, 1);
+          }
+        }
+      }
+    }
     return { order: toApiOrder(updated) };
   }
 

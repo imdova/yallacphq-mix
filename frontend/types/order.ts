@@ -16,6 +16,8 @@ export interface Order {
   paymentMethod?: "card" | "wallet" | "cash";
   status: OrderStatus;
   transactionId?: string;
+  courseIds?: string[];
+  bankTransferProofUrl?: string;
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
@@ -37,6 +39,8 @@ export interface CreateOrderInput {
   transactionId?: string;
   paidAt?: string;
   refundedAt?: string;
+  courseIds?: string[];
+  bankTransferProofUrl?: string;
 }
 
 export type UpdateOrderInput = Partial<CreateOrderInput> & {

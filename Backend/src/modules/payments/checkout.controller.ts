@@ -1,4 +1,5 @@
-import { Body, Controller, Post, UseGuards, UsePipes } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post, Req, UseGuards, UsePipes } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { RequestUser } from '../../common/auth/current-user.decorator';
 import { ResponseSchema } from '../../common/decorators/response-schema.decorator';
@@ -46,16 +47,36 @@ export class CheckoutController {
 
   @Post('session')
   @UseGuards(JwtAuthGuard)
-  @UsePipes(new ZodValidationPipe(createPaymentSessionBodySchema))
   @ResponseSchema(createPaymentSessionResponseSchema)
   @ApiOperation({ summary: 'Create payment session' })
   @ApiAuth()
   @ApiBody({ type: CreatePaymentSessionBodyDto })
   @ApiCreatedResponse({ type: CreatePaymentSessionResponseDto })
   async createSession(
-    @Body() body: CreatePaymentSessionBody,
+    @Req() req: Request,
     @CurrentUser() jwtUser: RequestUser,
   ) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = rawBody.trim() ? (JSON.parse(rawBody) as unknown) : {};
+      } catch {
+        rawBody = {};
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      rawBody = {};
+    }
+    const parsed = createPaymentSessionBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const body: CreatePaymentSessionBody = parsed.data;
+
     const dbUser = await this.users.findById(jwtUser.sub);
     const isBank = body.method === 'bank';
     const order = await this.orders.createPending({

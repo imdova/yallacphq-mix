@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,10 +8,12 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
   UsePipes,
   Version,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -121,11 +124,31 @@ export class AdminOrdersController {
   @Version('1')
   @Roles(AppRole.admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @UsePipes(new ZodValidationPipe(updateOrderBodySchema))
   @ResponseSchema(orderResponseSchema)
   @ApiOperation({ summary: 'Admin: update order' })
   @ApiAuth()
-  async update(@Param('id') id: string, @Body() body: UpdateOrderBody) {
+  async update(@Param('id') id: string, @Req() req: Request) {
+    let rawBody: unknown = req.body;
+    if (typeof rawBody === 'string') {
+      try {
+        rawBody = rawBody.trim() ? (JSON.parse(rawBody) as unknown) : {};
+      } catch {
+        rawBody = {};
+      }
+    }
+    if (typeof rawBody !== 'object' || rawBody === null) {
+      rawBody = {};
+    }
+    const parsed = updateOrderBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        issues: parsed.error.issues,
+      });
+    }
+    const body: UpdateOrderBody = parsed.data;
+
     const patch: UpdateOrderBody = { ...body };
     if (body.status === 'paid') {
       (patch as Record<string, unknown>).paidAt = new Date().toISOString();

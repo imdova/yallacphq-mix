@@ -4,10 +4,34 @@ import { createOrderBodySchema, listOrdersResponseSchema } from "@/lib/api/contr
 import { requireSession } from "@/lib/auth/server";
 import { getUserById } from "@/lib/db/users";
 import * as db from "@/lib/db/orders";
+import { getBackendUrl, isBackendConfigured, BACKEND_API_PREFIX } from "@/lib/api/backend-url";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (isBackendConfigured()) {
+    try {
+      const cookieHeader = req.headers.get("cookie") ?? "";
+      const res = await fetch(`${getBackendUrl()}${BACKEND_API_PREFIX}/orders`, {
+        method: "GET",
+        headers: { cookie: cookieHeader },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return jsonError(
+          res.status === 401 ? 401 : res.status === 403 ? 403 : 500,
+          (data?.message as string) ?? "Failed to load orders"
+        );
+      }
+      const parsed = listOrdersResponseSchema.safeParse(data);
+      if (!parsed.success) return jsonError(500, "Invalid response");
+      return jsonOk(parsed.data);
+    } catch (e) {
+      console.error("[orders GET]", e);
+      return jsonError(500, "Failed to load orders");
+    }
+  }
+
   try {
     const session = await requireSession();
     const user = await getUserById(session.uid);

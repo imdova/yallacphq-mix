@@ -23,6 +23,9 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Yalla CPHQ",
   description: "Production-grade SaaS starter",
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

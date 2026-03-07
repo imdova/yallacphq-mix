@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,9 @@ async function copyText(text: string) {
 }
 
 export function StudentOrdersView() {
+  const searchParams = useSearchParams();
+  const fromCheckout = searchParams.get("from") === "checkout";
+
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -93,7 +97,12 @@ export function StudentOrdersView() {
       setError(null);
       try {
         const data = await getUserOrders();
-        if (!cancelled) setOrders(data);
+        if (!cancelled) {
+          setOrders(data);
+          if (fromCheckout && typeof window !== "undefined") {
+            window.history.replaceState(null, "", "/dashboard/orders");
+          }
+        }
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Failed to load orders"));
       } finally {
@@ -103,7 +112,7 @@ export function StudentOrdersView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fromCheckout]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();

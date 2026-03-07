@@ -130,6 +130,24 @@ export function HomeHeader() {
           )}
         </nav>
         <div className="flex items-center gap-2">
+          {!isLoggedIn && (
+            <>
+              <Button
+                asChild
+                variant="ghost"
+                className="text-white hover:bg-white/10 font-semibold uppercase tracking-wide max-md:hidden"
+              >
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="border-gold/60 text-white hover:bg-white/10 font-semibold uppercase tracking-wide max-md:hidden"
+              >
+                <Link href="/signup">Sign up</Link>
+              </Button>
+            </>
+          )}
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
@@ -201,6 +219,22 @@ export function HomeHeader() {
                       Log out
                     </button>
                   </>
+                )}
+                {!isLoggedIn && (
+                  <div className="pt-4 flex flex-col gap-3">
+                    <Link
+                      href="/login"
+                      onClick={() => setOpen(false)}
+                      className="text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                    >
+                      Login
+                    </Link>
+                    <Link href="/signup" onClick={() => setOpen(false)}>
+                      <Button className="w-full bg-white/10 text-white hover:bg-white/15 font-semibold uppercase">
+                        Sign up
+                      </Button>
+                    </Link>
+                  </div>
                 )}
                 <Link href="#enroll" onClick={() => setOpen(false)} className="pt-4">
                   <Button className="w-full bg-gold text-gold-foreground hover:bg-gold/90 font-semibold uppercase">

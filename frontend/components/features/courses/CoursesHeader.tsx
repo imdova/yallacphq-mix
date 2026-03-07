@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -18,8 +19,6 @@ import { useCart } from "@/contexts/cart-context";
 
 const navLinks = [
   { href: "/courses", label: "All Courses" },
-  { href: "/courses?category=exam-prep", label: "Exam Prep" },
-  { href: "/courses?category=resources", label: "Resources" },
   { href: "/#about", label: "About Us" },
 ];
 
@@ -36,10 +35,14 @@ export function CoursesHeader() {
           href="/"
           className="flex items-center gap-2 text-lg font-semibold tracking-tight text-zinc-900"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold text-sm font-bold text-gold-foreground">
-            Y
-          </span>
-          Yalla CPHQ
+          <Image
+            src="/brand/logo-default.png"
+            alt="Yalla CPHQ"
+            width={220}
+            height={48}
+            className="h-9 w-auto"
+            priority
+          />
         </Link>
         <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
           <DropdownMenu>
@@ -89,7 +92,10 @@ export function CoursesHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
           {navLinks.map(({ href, label }) => {
-            const isActive = href === "/courses" ? pathname === "/courses" : pathname.startsWith(href.split("?")[0]);
+            const isActive =
+              href === "/courses"
+                ? pathname === "/courses"
+                : pathname.startsWith(href.split("?")[0]);
             return (
               <Link
                 key={href}
@@ -182,11 +188,15 @@ export function CoursesHeader() {
                     <ShoppingCart className="h-5 w-5" />
                     Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                   </Link>
-                  <Link href="/dashboard" onClick={() => setOpen(false)} className="text-zinc-600 hover:text-zinc-900">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setOpen(false)}
+                    className="text-zinc-600 hover:text-zinc-900"
+                  >
                     Login
                   </Link>
                   <Link href="/#enroll" onClick={() => setOpen(false)}>
-                    <Button className="w-full bg-gold text-gold-foreground hover:bg-gold/90 font-semibold">
+                    <Button className="w-full bg-gold font-semibold text-gold-foreground hover:bg-gold/90">
                       Join Now
                     </Button>
                   </Link>
@@ -194,7 +204,10 @@ export function CoursesHeader() {
               </nav>
             </SheetContent>
           </Sheet>
-          <Link href="/dashboard" className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 md:block">
+          <Link
+            href="/dashboard"
+            className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 md:block"
+          >
             Login
           </Link>
           <Button

@@ -9,7 +9,8 @@ const items = [
   {
     icon: BookOpen,
     title: "Updated curriculum",
-    description: "Content aligned with the latest CPHQ exam blueprint and healthcare quality standards.",
+    description:
+      "Content aligned with the latest CPHQ exam blueprint and healthcare quality standards.",
   },
   {
     icon: Lightbulb,
@@ -19,12 +20,14 @@ const items = [
   {
     icon: Users,
     title: "Global network",
-    description: "Join a community of quality professionals and access ongoing support and resources.",
+    description:
+      "Join a community of quality professionals and access ongoing support and resources.",
   },
   {
     icon: FileCheck,
     title: "Certification ready",
-    description: "Structured paths to CPHQ and micro-credentials with CME credits where applicable.",
+    description:
+      "Structured paths to CPHQ and micro-credentials with CME credits where applicable.",
   },
 ];
 
@@ -37,7 +40,9 @@ export function WhyChooseSection() {
     >
       <div className="container px-4 md:px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gold">Why Yalla CPHQ</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gold">
+            Why Yalla CPHQ
+          </p>
           <h2
             id="why-choose-heading"
             className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl md:text-4xl"

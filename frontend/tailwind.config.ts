@@ -69,8 +69,9 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        "home": ["var(--font-jakarta)", "var(--font-geist-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "monospace"],
-        serif: ["var(--font-playfair)", "Georgia", "serif"],
+        serif: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
       },
       fontSize: {
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],

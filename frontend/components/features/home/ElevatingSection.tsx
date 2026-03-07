@@ -13,8 +13,7 @@ const items = [
   {
     icon: Lightbulb,
     title: "Worked Learning",
-    description:
-      "Practical examples and case studies so you can apply concepts in real settings.",
+    description: "Practical examples and case studies so you can apply concepts in real settings.",
   },
   {
     icon: Network,
@@ -46,7 +45,12 @@ export function ElevatingSection() {
             >
               <span className="flex items-center gap-2 text-sm font-medium text-gold">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0h.5a2.5 2.5 0 0010.5-4.065M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0h.5a2.5 2.5 0 0010.5-4.065M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 Global Standard CPHQ Certified
               </span>
@@ -57,8 +61,7 @@ export function ElevatingSection() {
               id="elevating-heading"
               className="text-3xl font-semibold tracking-tight text-white md:text-4xl"
             >
-              Elevating Healthcare{" "}
-              <span className="font-serif text-gold">Quality Leaders</span>
+              Elevating Healthcare <span className="font-serif text-gold">Quality Leaders</span>
             </h2>
             <ul className="mt-10 space-y-8">
               {items.map((item, i) => (

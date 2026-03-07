@@ -8,7 +8,7 @@ import { getPublicCourses } from "@/lib/dal/courses";
 import type { Course } from "@/types/course";
 import { ArrowRight } from "lucide-react";
 
-const DISPLAY_COUNT = 6;
+const DISPLAY_COUNT = 12; // 4 per row × 3 rows
 
 export function CoursesSection() {
   const [courses, setCourses] = React.useState<Course[]>([]);
@@ -38,12 +38,14 @@ export function CoursesSection() {
       <div className="container px-4 md:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gold">Learning paths</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gold">
+              Learning paths
+            </p>
             <h2
               id="courses-heading"
               className="mt-1 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl md:text-4xl"
             >
-              Featured <span className="font-serif text-gold">Courses</span>
+              Featured <span className="text-gold">Courses</span>
             </h2>
             <p className="mt-2 max-w-lg text-sm text-zinc-600">
               World-class CPHQ exam prep, quality management, and healthcare excellence programs.
@@ -62,8 +64,8 @@ export function CoursesSection() {
         </div>
 
         {loading ? (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="mt-10 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 12 }).map((_, i) => (
               <div
                 key={i}
                 className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white"
@@ -81,7 +83,7 @@ export function CoursesSection() {
             ))}
           </div>
         ) : courses.length > 0 ? (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {courses.map((course) => (
               <CourseCard key={course.id} course={course} />
             ))}

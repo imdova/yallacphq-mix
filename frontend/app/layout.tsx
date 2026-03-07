@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Source_Code_Pro, Playfair_Display } from "next/font/google";
+import { Inter, Source_Code_Pro, Plus_Jakarta_Sans } from "next/font/google";
 import { AppProviders } from "@/components/shared/AppProviders";
 import "./globals.css";
 
@@ -14,10 +14,11 @@ const sourceCodePro = Source_Code_Pro({
   display: "swap",
 });
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -35,7 +36,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${sourceCodePro.variable} ${playfair.variable} font-sans antialiased`}>
+      <body
+        className={`${inter.variable} ${sourceCodePro.variable} ${plusJakarta.variable} font-sans antialiased`}
+      >
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

@@ -18,7 +18,10 @@ export function WebinarsPromoSection() {
           viewport={{ once: true }}
           className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-black p-8 md:p-12 lg:p-16"
         >
-          <div className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(ellipse_80%_80%_at_100%_0%,rgba(212,175,55,0.15),transparent)]" aria-hidden />
+          <div
+            className="absolute right-0 top-0 h-full w-1/2 bg-[radial-gradient(ellipse_80%_80%_at_100%_0%,rgba(212,175,55,0.15),transparent)]"
+            aria-hidden
+          />
           <div className="relative z-10 max-w-xl">
             <div className="flex items-center gap-2 text-gold">
               <Calendar className="h-4 w-4" aria-hidden />

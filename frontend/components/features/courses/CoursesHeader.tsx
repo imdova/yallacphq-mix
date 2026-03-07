@@ -16,6 +16,7 @@ import { Menu, ChevronDown, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OFFERS_DROPDOWN_ITEMS, WEBINARS_DROPDOWN_ITEMS, ROUTES } from "@/constants";
 import { useCart } from "@/contexts/cart-context";
+import { useAuth } from "@/contexts/auth-context";
 
 const navLinks = [
   { href: "/courses", label: "All Courses" },
@@ -26,6 +27,8 @@ export function CoursesHeader() {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const { courseIds } = useCart();
+  const { user, status } = useAuth();
+  const isLoggedIn = status === "authenticated" && !!user;
   const cartCount = courseIds.length;
 
   return (
@@ -188,34 +191,65 @@ export function CoursesHeader() {
                     <ShoppingCart className="h-5 w-5" />
                     Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                   </Link>
-                  <Link
-                    href="/dashboard"
-                    onClick={() => setOpen(false)}
-                    className="text-zinc-600 hover:text-zinc-900"
-                  >
-                    Login
-                  </Link>
-                  <Link href="/#enroll" onClick={() => setOpen(false)}>
-                    <Button className="w-full bg-gold font-semibold text-gold-foreground hover:bg-gold/90">
-                      Join Now
-                    </Button>
-                  </Link>
+                  {!isLoggedIn ? (
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <Link
+                        href={ROUTES.SIGNUP}
+                        onClick={() => setOpen(false)}
+                        className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+                      >
+                        Sign Up
+                      </Link>
+                      <Link
+                        href={ROUTES.LOGIN}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-white",
+                          "bg-[#34A853] shadow-sm transition hover:bg-[#2d9249]"
+                        )}
+                      >
+                        Login
+                      </Link>
+                    </div>
+                  ) : (
+                    <Link
+                      href={ROUTES.DASHBOARD}
+                      onClick={() => setOpen(false)}
+                      className="text-zinc-600 hover:text-zinc-900"
+                    >
+                      Dashboard
+                    </Link>
+                  )}
                 </div>
               </nav>
             </SheetContent>
           </Sheet>
-          <Link
-            href="/dashboard"
-            className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 md:block"
-          >
-            Login
-          </Link>
-          <Button
-            asChild
-            className="hidden rounded-lg bg-gold font-semibold text-gold-foreground hover:bg-gold/90 md:inline-flex"
-          >
-            <Link href="/#enroll">Join Now</Link>
-          </Button>
+          {!isLoggedIn ? (
+            <div className="hidden items-center gap-4 md:flex">
+              <Link
+                href={ROUTES.SIGNUP}
+                className="text-sm font-semibold text-zinc-700 transition-colors hover:text-zinc-900"
+              >
+                Sign Up
+              </Link>
+              <Link
+                href={ROUTES.LOGIN}
+                className={cn(
+                  "inline-flex items-center justify-center rounded-full bg-[#34A853] px-4 py-2 text-sm font-semibold text-white",
+                  "shadow-sm transition hover:bg-[#2d9249]"
+                )}
+              >
+                Login
+              </Link>
+            </div>
+          ) : (
+            <Link
+              href={ROUTES.DASHBOARD}
+              className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 md:block"
+            >
+              Dashboard
+            </Link>
+          )}
         </div>
       </div>
     </header>

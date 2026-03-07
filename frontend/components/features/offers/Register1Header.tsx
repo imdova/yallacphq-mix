@@ -25,7 +25,7 @@ export function Register1Header() {
           </Link>
           <Button
             asChild
-            className="bg-gold text-gold-foreground hover:bg-gold/90 font-semibold uppercase tracking-wide px-6"
+            className="bg-gold px-6 font-semibold uppercase tracking-wide text-gold-foreground hover:bg-gold/90"
           >
             <Link href="/#enroll">Get Started</Link>
           </Button>

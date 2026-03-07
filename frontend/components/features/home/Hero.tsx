@@ -9,7 +9,10 @@ export function Hero() {
       className="relative min-h-[85vh] overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-black px-4 py-16 sm:py-20 md:py-24 lg:py-28"
       aria-label="Hero"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(212,175,55,0.08),transparent)]" aria-hidden />
+      <div
+        className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(212,175,55,0.08),transparent)]"
+        aria-hidden
+      />
       <div className="container relative z-10 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
         <div className="max-w-xl space-y-5">
           <p className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/5 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-gold">
@@ -46,7 +49,7 @@ export function Hero() {
             </Button>
           </div>
         </div>
-        <div className="relative mt-8 lg:mt-0 md:block">
+        <div className="relative mt-8 md:block lg:mt-0">
           <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gold/20 shadow-2xl shadow-black/50 ring-1 ring-white/5">
             <iframe
               src={`https://www.youtube.com/embed/${HERO_VIDEO_ID}?rel=0&modestbranding=1`}

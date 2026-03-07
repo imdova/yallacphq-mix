@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Check,
   Star,
@@ -23,8 +25,9 @@ import {
   Timer,
   BookOpen,
   ThumbsUp,
-  BarChart3,
-  MessageSquare,
+  ImageIcon,
+  Video,
+  Settings,
 } from "lucide-react";
 import { CourseCard } from "@/components/features/courses/CourseCard";
 import { CoursesHeader } from "@/components/features/courses/CoursesHeader";
@@ -36,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useCart } from "@/contexts/cart-context";
 import { getErrorMessage } from "@/lib/api/error";
+import { getReviewMediaForCourse, youtubeEmbedUrl, youtubeThumbUrl, type ReviewMediaItem } from "./reviewMedia";
 
 const COURSE_INCLUDES = [
   "Lifetime Access",
@@ -109,21 +113,6 @@ const CURRICULUM_MODULES = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: "Dr. Rowan M.",
-    quote:
-      "The mock exams were identical to the real CPHQ exam. The way data analytics is explained made it simple. Passed from the first try!",
-    cta: "Preview My First Try",
-  },
-  {
-    name: "Mona Fathima S.",
-    quote:
-      "I was struggling with Patient Safety before I joined Yalla CPHQ. The private community's support is amazing. Highly recommended!",
-    cta: "Preview My Results",
-  },
-];
-
 const FOOTER_PROGRAMS = [
   "CPHQ Preparation",
   "Patient Safety Report",
@@ -165,6 +154,17 @@ function splitBullets(input?: string): string[] {
     .filter(Boolean);
 
   return Array.from(new Set(parts));
+}
+
+function splitKeywords(input?: string): string[] {
+  if (!input) return [];
+  const s = input.trim();
+  if (!s) return [];
+  const parts = s
+    .split(/,|\||\n|;/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).slice(0, 10);
 }
 
 function getYouTubeId(input?: string): string | null {
@@ -311,6 +311,8 @@ export function CourseDetailsView() {
   const [allPublicCourses, setAllPublicCourses] = React.useState<Course[]>([]);
   const [showAllLearn, setShowAllLearn] = React.useState(false);
   const [showInstructorMore, setShowInstructorMore] = React.useState(false);
+  const [reviewMediaOpen, setReviewMediaOpen] = React.useState(false);
+  const [activeReviewMedia, setActiveReviewMedia] = React.useState<ReviewMediaItem | null>(null);
   const [expandedModules, setExpandedModules] = React.useState<Record<string, boolean>>({
     "1": false,
     "2": true,
@@ -361,7 +363,6 @@ export function CourseDetailsView() {
   const tag = displayCourse.tag ?? "Exam Prep";
   const tagStyle = TAG_STYLES[tag] ?? "bg-gold text-gold-foreground";
   const rating = displayCourse.rating ?? 4.9;
-  const reviewCount = displayCourse.reviewCount ?? 0;
   const enrolledCount = displayCourse.enrolledCount ?? 2400;
   const instructorName = displayCourse.instructorName ?? "Dr Ahmed Habib";
   const instructorTitle = displayCourse.instructorTitle ?? "CPHQ, Healthcare Quality Director";
@@ -392,6 +393,10 @@ export function CourseDetailsView() {
   const certLabel = displayCourse.certificationType ?? "Certificate Included";
   const learnPreviewCount = 4;
   const learnItemsVisible = showAllLearn ? LEARN_ITEMS : LEARN_ITEMS.slice(0, learnPreviewCount);
+  const skillsTags =
+    splitKeywords(displayCourse.seoKeywords).length > 0
+      ? splitKeywords(displayCourse.seoKeywords)
+      : ["Health", "Healthcare", "Quality", "Patient Safety"];
 
   const instructorCourses = React.useMemo(() => {
     const name = instructorName.trim();
@@ -414,36 +419,9 @@ export function CourseDetailsView() {
       ? displayCourse.instructorImageUrl
       : undefined;
 
-  const ratingHistogram = React.useMemo(() => {
-    // If we don't have real per-star counts, generate a plausible distribution based on rating.
-    if (!reviewCount) {
-      return [
-        { stars: 5, pct: 72 },
-        { stars: 4, pct: 18 },
-        { stars: 3, pct: 6 },
-        { stars: 2, pct: 3 },
-        { stars: 1, pct: 1 },
-      ];
-    }
-    const r = Math.min(5, Math.max(0, rating));
-    const w5 = Math.max(0.1, r - 3);
-    const w4 = Math.max(0.1, 4.8 - Math.abs(r - 4.3));
-    const w3 = Math.max(0.05, 3.8 - Math.abs(r - 3.4));
-    const w2 = Math.max(0.03, 2.5 - Math.abs(r - 2.2));
-    const w1 = Math.max(0.02, 1.6 - Math.abs(r - 1.3));
-    const sum = w5 + w4 + w3 + w2 + w1;
-    const raw = [w5, w4, w3, w2, w1].map((w) => Math.round((w / sum) * 100));
-    // fix rounding drift
-    const drift = 100 - raw.reduce((a, b) => a + b, 0);
-    raw[0] += drift;
-    return [
-      { stars: 5, pct: raw[0] },
-      { stars: 4, pct: raw[1] },
-      { stars: 3, pct: raw[2] },
-      { stars: 2, pct: raw[3] },
-      { stars: 1, pct: raw[4] },
-    ];
-  }, [rating, reviewCount]);
+  const reviewMedia = React.useMemo(() => getReviewMediaForCourse(courseId), [courseId]);
+
+  // rating kept for other UI sections
 
   const onEnroll = async () => {
     if (!courseId) return;
@@ -559,7 +537,7 @@ export function CourseDetailsView() {
         }
       >
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(212,175,55,0.16),transparent)]" />
-        <div className="container relative grid gap-6 sm:gap-8 lg:grid-cols-[1fr_minmax(320px,400px)] lg:items-start lg:gap-12">
+        <div className="container relative grid gap-6 sm:gap-8 lg:grid-cols-[1fr_minmax(360px,520px)] lg:items-center lg:gap-12">
           <div className="flex min-w-0 flex-col justify-center">
             <div className="flex flex-wrap items-center gap-2">
               <span
@@ -613,7 +591,7 @@ export function CourseDetailsView() {
             </div>
           </div>
           <div className="relative flex w-full min-w-0 flex-col items-stretch gap-4 sm:items-center lg:items-end">
-            <div className="w-full min-w-0 max-w-full sm:max-w-md lg:max-w-[400px]">
+            <div className="w-full min-w-0 max-w-full sm:max-w-lg lg:max-w-[520px]">
               <YouTubePreviewPlayer videoId={videoId} />
             </div>
           </div>
@@ -658,6 +636,30 @@ export function CourseDetailsView() {
               <span id="learn-outcomes" className="sr-only" />
             </section>
 
+            {/* Knowledge & Skills */}
+            <section className="rounded-2xl bg-sky-50/80 p-4 sm:p-6 md:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-zinc-800 shadow-sm ring-1 ring-sky-100">
+                    <Settings className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">
+                    Knowledge &amp; Skills You Will Learn
+                  </h2>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {skillsTags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-semibold text-sky-700 shadow-sm"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </section>
+
             {/* Who Should Attend */}
             <section>
               <Card className="overflow-hidden rounded-2xl border-zinc-200 bg-white shadow-sm">
@@ -687,69 +689,150 @@ export function CourseDetailsView() {
 
             {/* Curriculum */}
             <section id="curriculum" className="scroll-mt-24">
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <SectionTitle>Curriculum</SectionTitle>
-                <span className="text-sm text-zinc-500">
-                  {totalModules} Modules · {totalLessons} Lessons · {durationHours}h
-                </span>
-              </div>
-              <div className="mt-4 space-y-2 sm:mt-6">
-                {CURRICULUM_MODULES.map((mod) => (
-                  <Card
-                    key={mod.id}
-                    className="overflow-hidden border-zinc-200 transition hover:border-zinc-300"
-                  >
-                    <button
-                      type="button"
-                      className="flex w-full flex-col gap-2 p-3 text-left sm:flex-row sm:items-center sm:justify-between sm:p-4"
-                      onClick={() => toggleModule(mod.id)}
-                    >
-                      <span className="font-medium text-zinc-900 min-w-0 break-words">{mod.title}</span>
-                      <span className="flex shrink-0 items-center gap-2 text-sm text-zinc-500">
-                        {mod.lessons} lessons · {mod.duration}
-                        {expandedModules[mod.id] ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </span>
-                    </button>
-                    {"subLessons" in mod && expandedModules[mod.id] && (
-                      <div className="border-t border-zinc-100 bg-zinc-50/80 px-3 py-2 sm:px-4 sm:py-3">
-                        {mod.subLessons!.map((s) => (
-                          <div key={s.title} className="flex flex-col gap-0.5 py-2 text-sm sm:flex-row sm:justify-between sm:gap-2">
-                            <span className="min-w-0 text-zinc-700">{s.title}</span>
-                            <span className="shrink-0 tabular-nums text-zinc-500">{s.duration}</span>
-                          </div>
-                        ))}
+              {(() => {
+                const safeHours = Math.round(durationHours * 10) / 10;
+                const allExpanded = CURRICULUM_MODULES.every((m) => expandedModules[m.id]);
+                const shouldExpand = !allExpanded;
+
+                const toggleAll = () => {
+                  setExpandedModules(() =>
+                    Object.fromEntries(CURRICULUM_MODULES.map((m) => [m.id, shouldExpand])) as Record<string, boolean>
+                  );
+                };
+
+                return (
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="h-8 w-1.5 rounded-full bg-gold" aria-hidden />
+                          <h2 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">
+                            Smart Curriculum
+                          </h2>
+                        </div>
+                        <p className="mt-1 text-sm text-zinc-600">
+                          {totalModules} Modules • {totalLessons} Lessons • {safeHours}h total length
+                        </p>
                       </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
+
+                      <button
+                        type="button"
+                        onClick={toggleAll}
+                        className="inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold text-gold hover:bg-gold/10"
+                      >
+                        {allExpanded ? "Collapse All" : "Expand All"}
+                      </button>
+                    </div>
+
+                    <div className="mt-6 space-y-4">
+                      {CURRICULUM_MODULES.map((mod) => {
+                        const open = expandedModules[mod.id] ?? false;
+                        const hasSubLessons = "subLessons" in mod && Array.isArray(mod.subLessons) && mod.subLessons.length > 0;
+
+                        return (
+                          <div
+                            key={mod.id}
+                            className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+                          >
+                            <button
+                              type="button"
+                              className="flex w-full flex-col gap-3 p-4 text-left sm:flex-row sm:items-center sm:justify-between"
+                              onClick={() => toggleModule(mod.id)}
+                              aria-expanded={open}
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600">
+                                  <ChevronDown className={cn("h-5 w-5 transition-transform", open ? "rotate-180" : "rotate-0")} />
+                                </span>
+                                <span className="min-w-0 break-words text-base font-semibold text-zinc-900">
+                                  {mod.title}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-zinc-600 sm:justify-end">
+                                <span className="inline-flex items-center gap-2">
+                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                                    <PlayCircle className="h-4 w-4" />
+                                  </span>
+                                  <span className="font-semibold text-zinc-900">{mod.lessons}</span>
+                                  <span className="text-zinc-500">Lessons</span>
+                                </span>
+                                <span className="inline-flex items-center gap-2">
+                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                                    <Clock className="h-4 w-4" />
+                                  </span>
+                                  <span className="font-semibold text-zinc-900">{mod.duration}</span>
+                                </span>
+                              </div>
+                            </button>
+
+                            {open ? (
+                              <div className="border-t border-zinc-200 bg-zinc-50/60">
+                                {hasSubLessons ? (
+                                  <div className="divide-y divide-zinc-200">
+                                    {mod.subLessons!.map((s) => (
+                                      <div
+                                        key={s.title}
+                                        className="flex items-center justify-between gap-4 px-4 py-3"
+                                      >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200">
+                                            <PlayCircle className="h-4 w-4" />
+                                          </span>
+                                          <span className="min-w-0 text-sm text-zinc-700">
+                                            {s.title}
+                                          </span>
+                                        </div>
+                                        <span className="shrink-0 tabular-nums text-sm text-zinc-500">
+                                          {s.duration}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="px-4 py-4 text-sm text-zinc-600">
+                                    Lessons list coming soon.
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </section>
 
             {/* Instructor */}
             <section>
-              <SectionTitle>About the instructor</SectionTitle>
               <Card className="mt-6 overflow-hidden border-zinc-200 bg-white shadow-sm">
                 <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
+                  <h2 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">
+                    About Your Course Publisher
+                  </h2>
+
+                  <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
                     <div className="flex shrink-0 items-center justify-center">
                       <div
                         className={cn(
-                          "h-20 w-20 rounded-full ring-4 ring-white shadow-sm",
-                          "bg-gradient-to-br from-zinc-100 to-zinc-200"
+                          "h-24 w-24 rounded-full border-4 border-zinc-200 bg-white shadow-sm",
+                          "grid place-items-center overflow-hidden"
                         )}
-                        style={
-                          instructorAvatarUrl
-                            ? { backgroundImage: `url(${instructorAvatarUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-                            : undefined
-                        }
                         aria-hidden
                       >
-                        {!instructorAvatarUrl ? (
-                          <div className="flex h-full w-full items-center justify-center text-lg font-bold text-zinc-600">
+                        {instructorAvatarUrl ? (
+                          <Image
+                            src={instructorAvatarUrl}
+                            alt={instructorName}
+                            width={96}
+                            height={96}
+                            className="h-full w-full object-cover"
+                            unoptimized={instructorAvatarUrl.startsWith("http")}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-zinc-600">
                             {instructorName
                               .split(/\s+/)
                               .filter(Boolean)
@@ -757,54 +840,54 @@ export function CourseDetailsView() {
                               .map((s) => s[0]!.toUpperCase())
                               .join("")}
                           </div>
-                        ) : null}
+                        )}
                       </div>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-zinc-700">
-                        About your course publisher
-                      </p>
-                      <button
-                        type="button"
-                        className="mt-1 inline-flex max-w-full items-baseline gap-2 text-left"
-                        onClick={() => setShowInstructorMore(true)}
-                      >
-                        <span className="truncate text-lg font-bold text-zinc-900 underline underline-offset-4">
-                          {instructorName}
-                        </span>
-                        <span className="text-sm font-semibold text-zinc-500">Stats</span>
-                      </button>
-
-                      <p className="mt-1 text-sm text-zinc-500">{instructorTitle}</p>
-
-                      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-700">
-                        <span className="inline-flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gold" />
-                          <span className="font-semibold">{instructorLearners.toLocaleString()}</span>
-                          <span className="text-zinc-500">learners</span>
-                        </span>
-                        <span className="inline-flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-gold" />
-                          <span className="font-semibold">{instructorCourseCount}</span>
-                          <span className="text-zinc-500">courses</span>
-                        </span>
-                        <span className="inline-flex items-center gap-2">
-                          <ThumbsUp className="h-4 w-4 text-gold" />
-                          <span className="font-semibold">{Math.max(0, instructorLearners).toLocaleString()}</span>
-                          <span className="text-zinc-500">learners benefited</span>
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <button
+                          type="button"
+                          className="max-w-full text-left"
+                          onClick={() => setShowInstructorMore(true)}
+                        >
+                          <span className="break-words text-lg font-bold text-zinc-900 underline underline-offset-4">
+                            {instructorName}
+                          </span>
+                        </button>
+                        <span className="text-sm font-semibold text-zinc-700">
+                          Publisher Stats
                         </span>
                       </div>
 
-                      <p className="mt-4 text-sm leading-relaxed text-zinc-600">
-                        {showInstructorMore ? instructorBio : `${instructorBio.slice(0, 150)}${instructorBio.length > 150 ? "…" : ""}`}
-                        {instructorBio.length > 150 ? (
+                      <p className="mt-2 text-sm font-medium text-zinc-500">
+                        {instructorTitle}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm text-zinc-700">
+                        <span className="inline-flex items-center gap-2 font-semibold text-zinc-900">
+                          <span className="text-purple-600" aria-hidden>🎓</span>
+                          {instructorLearners.toLocaleString()} <span className="font-medium text-zinc-600">Learners</span>
+                        </span>
+                        <span className="inline-flex items-center gap-2 font-semibold text-zinc-900">
+                          <span className="text-orange-500" aria-hidden>📚</span>
+                          {instructorCourseCount} <span className="font-medium text-zinc-600">Courses</span>
+                        </span>
+                        <span className="inline-flex items-center gap-2 font-semibold text-zinc-900">
+                          <span className="text-sky-600" aria-hidden>👍</span>
+                          {Math.max(0, instructorLearners).toLocaleString()} <span className="font-medium text-zinc-600">Learners Benefited From Their Courses</span>
+                        </span>
+                      </div>
+
+                      <p className="mt-5 text-sm leading-relaxed text-zinc-600">
+                        {showInstructorMore ? instructorBio : `${instructorBio.slice(0, 170)}${instructorBio.length > 170 ? "…" : ""}`}
+                        {instructorBio.length > 170 ? (
                           <button
                             type="button"
                             onClick={() => setShowInstructorMore((v) => !v)}
                             className="ml-2 font-semibold text-zinc-700 hover:underline"
                           >
-                            {showInstructorMore ? "Read less" : "Read more"}
+                            {showInstructorMore ? "Read Less" : "Read More"}
                           </button>
                         ) : null}
                       </p>
@@ -819,127 +902,193 @@ export function CourseDetailsView() {
               <SectionTitle>Students Reviews &amp; Feedback</SectionTitle>
               <Card className="mt-6 overflow-hidden border-zinc-200 bg-white shadow-sm">
                 <CardContent className="p-4 sm:p-6 md:p-8">
-                  <div className="grid gap-6 lg:grid-cols-[320px_1fr] lg:gap-10">
-                    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-5">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-zinc-900">Overall rating</p>
-                          <div className="mt-2 flex items-baseline gap-3">
-                            <span className="text-4xl font-bold tracking-tight text-zinc-900">
-                              {Math.round(rating * 10) / 10}
-                            </span>
-                            <div className="flex flex-col gap-1">
-                              <div className="flex gap-0.5 text-gold" aria-label={`${rating} out of 5`}>
-                                {[1, 2, 3, 4, 5].map((i) => (
-                                  <Star key={i} className={cn("h-4 w-4", i <= Math.round(rating) && "fill-current")} />
+                  {reviewMedia.length ? (
+                    (() => {
+                      const isVideoItem = (m: ReviewMediaItem) => m.kind === "video" || m.kind === "youtube";
+                      const videos = reviewMedia.filter(isVideoItem);
+                      const featured = videos[0] ?? null;
+                      const topRight = videos.slice(1, 7);
+                      const galleryItems = (() => {
+                        const topIds = new Set<string>();
+                        if (featured) topIds.add(featured.id);
+                        for (const m of topRight) topIds.add(m.id);
+                        return reviewMedia.filter((m) => !topIds.has(m.id));
+                      })();
+                      const missingTopRight = Math.max(0, 6 - topRight.length);
+
+                      const tileThumb = (m: ReviewMediaItem): string | undefined => {
+                        if (m.kind === "image") return m.src;
+                        if (m.kind === "video") return m.poster;
+                        return youtubeThumbUrl(m.src) ?? undefined;
+                      };
+
+                      const Tile = ({
+                        m,
+                        className,
+                        aspectClass,
+                      }: {
+                        m: ReviewMediaItem;
+                        className?: string;
+                        aspectClass: string;
+                      }) => {
+                        const isVideo = m.kind === "video" || m.kind === "youtube";
+                        const thumbSrc = tileThumb(m);
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveReviewMedia(m);
+                              setReviewMediaOpen(true);
+                            }}
+                            className={cn(
+                              "group relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 text-left shadow-sm transition",
+                              "hover:border-gold/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gold/40",
+                              className
+                            )}
+                          >
+                            <div className={cn("relative w-full bg-zinc-100", aspectClass)}>
+                              {thumbSrc ? (
+                                <Image
+                                  src={thumbSrc}
+                                  alt={m.caption ?? "Review media"}
+                                  fill
+                                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 60vw, 50vw"
+                                  className="object-cover"
+                                  unoptimized={thumbSrc.startsWith("http")}
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-zinc-500">
+                                  {isVideo ? <Video className="h-8 w-8" /> : <ImageIcon className="h-8 w-8" />}
+                                </div>
+                              )}
+                              {isVideo ? (
+                                <div className="absolute inset-0 grid place-items-center">
+                                  <span className="grid h-12 w-12 place-items-center rounded-full bg-black/50 text-white ring-1 ring-white/20">
+                                    <PlayCircle className="h-7 w-7" />
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
+                          </button>
+                        );
+                      };
+
+                      return (
+                        <div className="space-y-6">
+                          {featured ? (
+                            <div className="grid gap-4 md:grid-cols-12">
+                              <div className="md:col-span-4">
+                                <Tile m={featured} aspectClass="aspect-[9/16]" />
+                              </div>
+                              <div className="grid gap-4 md:col-span-8 md:grid-cols-2">
+                                {topRight.map((m) => (
+                                  <Tile key={m.id} m={m} aspectClass="aspect-video" />
+                                ))}
+                                {Array.from({ length: missingTopRight }).map((_, i) => (
+                                  <div
+                                    key={`vid-slot-${i}`}
+                                    className="aspect-video w-full rounded-2xl border border-dashed border-zinc-200 bg-zinc-50"
+                                  />
                                 ))}
                               </div>
-                              <p className="text-sm text-zinc-600">
-                                {reviewCount ? `${reviewCount.toLocaleString()} reviews` : "No reviews yet"}
-                              </p>
                             </div>
+                          ) : null}
+
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                            {galleryItems.length ? (
+                              galleryItems.slice(0, 12).map((m) => (
+                                <Tile key={m.id} m={m} aspectClass="aspect-square" />
+                              ))
+                            ) : (
+                              Array.from({ length: 8 }).map((_, i) => (
+                                <div
+                                  key={`gal-slot-${i}`}
+                                  className="aspect-square w-full rounded-2xl border border-dashed border-zinc-200 bg-zinc-50"
+                                />
+                              ))
+                            )}
                           </div>
                         </div>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-zinc-700 shadow-sm ring-1 ring-zinc-200">
-                          <BarChart3 className="h-5 w-5" />
+                      );
+                    })()
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-12">
+                        <div className="md:col-span-5">
+                          <div className="aspect-[9/16] w-full animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100" />
+                        </div>
+                        <div className="grid gap-4 md:col-span-7 md:grid-cols-2">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="aspect-video w-full animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100"
+                            />
+                          ))}
                         </div>
                       </div>
-
-                      <div className="mt-5 space-y-2.5">
-                        {ratingHistogram.map(({ stars, pct }) => (
-                          <div key={stars} className="flex items-center gap-3">
-                            <span className="w-10 text-sm font-semibold text-zinc-700">{stars}★</span>
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-200">
-                              <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-                            </div>
-                            <span className="w-10 text-right text-sm text-zinc-600">{pct}%</span>
-                          </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="aspect-square w-full animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100"
+                          />
                         ))}
                       </div>
-
-                      <div className="mt-5 flex items-center gap-2 text-sm text-zinc-600">
-                        <MessageSquare className="h-4 w-4 text-zinc-500" />
-                        <span>Real feedback helps students choose confidently.</span>
-                      </div>
                     </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-zinc-900">Highlighted reviews</p>
-                          <p className="mt-1 text-sm text-zinc-600">
-                            A snapshot of what learners say about this course.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {TESTIMONIALS.slice(0, 2).map((t) => (
-                          <Card key={t.name} className="overflow-hidden border-zinc-200">
-                            <CardContent className="p-4 sm:p-5">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate font-semibold text-zinc-900">{t.name}</p>
-                                  <div className="mt-1 flex gap-0.5 text-gold" aria-hidden>
-                                    {[1, 2, 3, 4, 5].map((i) => (
-                                      <Star key={i} className="h-4 w-4 fill-current" />
-                                    ))}
-                                  </div>
-                                </div>
-                                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                                  Verified learner
-                                </span>
-                              </div>
-                              <p className="mt-3 text-sm leading-relaxed text-zinc-600">
-                                &ldquo;{t.quote}&rdquo;
-                              </p>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-
-                      <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-                        <p className="text-sm font-semibold text-zinc-900">Want to see more?</p>
-                        <p className="mt-1 text-sm text-zinc-600">
-                          Reviews will expand as more learners complete and rate the course.
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <Button asChild variant="outline" className="rounded-xl border-zinc-200">
-                            <Link href="#curriculum">View curriculum</Link>
-                          </Button>
-                          <Button asChild className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90">
-                            <Link href="/dashboard/support">Contact support</Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </section>
 
-            {/* Related */}
-            {relatedCourses.length > 0 && (
-              <section>
-                <SectionTitle>Related Courses</SectionTitle>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Explore more programs to support your CPHQ journey.
-                </p>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  {relatedCourses.map((c) => (
-                    <CourseCard key={c.id} course={c} />
-                  ))}
-                </div>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="mt-6 rounded-xl border-zinc-300"
-                  size="lg"
-                >
-                  <Link href="/courses">View all courses</Link>
-                </Button>
-              </section>
-            )}
+            <Dialog
+              open={reviewMediaOpen}
+              onOpenChange={(open) => {
+                setReviewMediaOpen(open);
+                if (!open) setActiveReviewMedia(null);
+              }}
+            >
+              <DialogContent className="max-w-5xl border-zinc-800 bg-black p-0 text-white" showClose>
+                {activeReviewMedia ? (
+                  <div className="relative w-full">
+                    <div className="relative aspect-video w-full bg-black md:min-h-[520px] md:aspect-auto">
+                      {activeReviewMedia.kind === "image" ? (
+                        <Image
+                          src={activeReviewMedia.src}
+                          alt={activeReviewMedia.caption ?? "Review media"}
+                          fill
+                          sizes="100vw"
+                          className="object-contain"
+                          unoptimized={activeReviewMedia.src.startsWith("http")}
+                        />
+                      ) : activeReviewMedia.kind === "video" ? (
+                        <video
+                          src={activeReviewMedia.src}
+                          poster={activeReviewMedia.poster}
+                          controls
+                          autoPlay
+                          playsInline
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <iframe
+                          title={activeReviewMedia.caption ?? "YouTube review"}
+                          src={youtubeEmbedUrl(activeReviewMedia.src) ?? undefined}
+                          className="h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      )}
+                    </div>
+                    {activeReviewMedia.caption ? (
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                        <p className="text-sm text-white/90">{activeReviewMedia.caption}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </DialogContent>
+            </Dialog>
+
           </div>
 
           {/* Sidebar */}
@@ -1046,6 +1195,28 @@ export function CourseDetailsView() {
             </Card>
           </aside>
         </div>
+
+        {/* Related (full width) */}
+        {relatedCourses.length > 0 && (
+          <section className="mt-10 sm:mt-14">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <SectionTitle>Related Courses</SectionTitle>
+                <p className="mt-2 text-sm text-zinc-600">
+                  Explore more programs to support your CPHQ journey.
+                </p>
+              </div>
+              <Button asChild variant="outline" className="rounded-xl border-zinc-300 sm:shrink-0" size="lg">
+                <Link href="/courses">View all courses</Link>
+              </Button>
+            </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {relatedCourses.map((c) => (
+                <CourseCard key={c.id} course={c} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Footer */}

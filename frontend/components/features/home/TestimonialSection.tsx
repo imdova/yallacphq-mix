@@ -54,7 +54,9 @@ export function TestimonialSection() {
               <div className="mt-4 flex items-center gap-3">
                 <div className="h-10 w-10 shrink-0 rounded-full bg-zinc-200" aria-hidden />
                 <div>
-                  <p className="font-semibold text-zinc-900">{t.name}, {t.credential}</p>
+                  <p className="font-semibold text-zinc-900">
+                    {t.name}, {t.credential}
+                  </p>
                   <p className="text-xs text-zinc-500">{t.role}</p>
                 </div>
               </div>

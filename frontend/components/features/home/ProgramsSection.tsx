@@ -11,7 +11,8 @@ const programs = [
   {
     id: "cphq",
     title: "CPHQ Preparation",
-    description: "Comprehensive preparation for the CPHQ certification exam with practice questions and study materials.",
+    description:
+      "Comprehensive preparation for the CPHQ certification exam with practice questions and study materials.",
     price: "$499",
     icon: BookOpen,
     iconBg: "bg-white ring-2 ring-emerald-500/50",
@@ -20,7 +21,8 @@ const programs = [
   {
     id: "tools",
     title: "Quality Tools",
-    description: "Master essential quality improvement tools and techniques used in healthcare settings.",
+    description:
+      "Master essential quality improvement tools and techniques used in healthcare settings.",
     price: "$349",
     icon: Wrench,
     iconBg: "bg-teal",
@@ -44,8 +46,7 @@ export function ProgramsSection() {
         <div className="grid gap-8 lg:grid-cols-[1fr_2fr] lg:gap-12">
           <div>
             <h2 id="programs-heading" className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Top Professional{" "}
-              <span className="font-serif text-gold">Programs</span>
+              Top Professional <span className="font-serif text-gold">Programs</span>
             </h2>
           </div>
           <p className="max-w-md text-sm text-zinc-500 lg:max-w-sm">
@@ -83,7 +84,10 @@ export function ProgramsSection() {
                 <CardContent className="space-y-4 pt-0">
                   <p className="text-sm text-zinc-500">{program.description}</p>
                   <p className="text-xl font-semibold text-zinc-900">{program.price}</p>
-                  <Button variant="link" className="h-auto p-0 text-sm font-medium text-zinc-900 underline-offset-4 hover:underline">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-sm font-medium text-zinc-900 underline-offset-4 hover:underline"
+                  >
                     Add to Cart
                   </Button>
                 </CardContent>
@@ -98,7 +102,12 @@ export function ProgramsSection() {
           >
             Browse All Catalog
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </Link>
         </div>

@@ -36,7 +36,10 @@ export function HomeHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/80 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between gap-4 px-4 md:px-6">
-        <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white"
+        >
           <Image
             src="/brand/logo-black.png"
             alt="Yalla CPHQ"
@@ -58,7 +61,10 @@ export function HomeHeader() {
               Offers
               <ChevronDown className="h-4 w-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[200px] border-zinc-800 bg-zinc-900 text-white">
+            <DropdownMenuContent
+              align="start"
+              className="min-w-[200px] border-zinc-800 bg-zinc-900 text-white"
+            >
               <DropdownMenuItem asChild className="focus:bg-zinc-800 focus:text-white">
                 <Link href="/offers">All offers</Link>
               </DropdownMenuItem>
@@ -80,7 +86,10 @@ export function HomeHeader() {
               Webinars
               <ChevronDown className="h-4 w-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[200px] border-zinc-800 bg-zinc-900 text-white">
+            <DropdownMenuContent
+              align="start"
+              className="min-w-[200px] border-zinc-800 bg-zinc-900 text-white"
+            >
               <DropdownMenuItem asChild className="focus:bg-zinc-800 focus:text-white">
                 <Link href="/webinars">All webinars</Link>
               </DropdownMenuItem>
@@ -109,7 +118,7 @@ export function HomeHeader() {
                 href="/dashboard/profile"
                 className={cn(
                   "text-sm font-medium uppercase tracking-wide text-white/90",
-                  "transition-colors hover:text-white inline-flex items-center gap-1.5"
+                  "inline-flex items-center gap-1.5 transition-colors hover:text-white"
                 )}
               >
                 <User className="h-4 w-4" />
@@ -120,7 +129,7 @@ export function HomeHeader() {
                 onClick={() => void handleLogout()}
                 className={cn(
                   "text-sm font-medium uppercase tracking-wide text-white/90",
-                  "transition-colors hover:text-white inline-flex items-center gap-1.5"
+                  "inline-flex items-center gap-1.5 transition-colors hover:text-white"
                 )}
               >
                 <LogOut className="h-4 w-4" />
@@ -131,22 +140,23 @@ export function HomeHeader() {
         </nav>
         <div className="flex items-center gap-2">
           {!isLoggedIn && (
-            <>
-              <Button
-                asChild
-                variant="ghost"
-                className="text-white hover:bg-white/10 font-semibold uppercase tracking-wide max-md:hidden"
+            <div className="hidden items-center gap-4 md:flex">
+              <Link
+                href="/auth/signup"
+                className="text-sm font-semibold text-white transition-colors hover:text-white/90"
               >
-                <Link href="/login">Login</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="border-gold/60 text-white hover:bg-white/10 font-semibold uppercase tracking-wide max-md:hidden"
+                Sign Up
+              </Link>
+              <Link
+                href="/auth/login"
+                className={cn(
+                  "inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold",
+                  "bg-[#34A853] text-white shadow-sm transition hover:bg-[#2d9249]"
+                )}
               >
-                <Link href="/signup">Sign up</Link>
-              </Button>
-            </>
+                Login
+              </Link>
+            </div>
           )}
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild className="md:hidden">
@@ -205,7 +215,7 @@ export function HomeHeader() {
                     <Link
                       href="/dashboard/profile"
                       onClick={() => setOpen(false)}
-                      className="text-lg font-medium uppercase tracking-wide text-white hover:text-gold inline-flex items-center gap-2"
+                      className="inline-flex items-center gap-2 text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
                     >
                       <User className="h-5 w-5" />
                       Profile
@@ -213,7 +223,7 @@ export function HomeHeader() {
                     <button
                       type="button"
                       onClick={() => void handleLogout()}
-                      className="text-lg font-medium uppercase tracking-wide text-white hover:text-gold inline-flex items-center gap-2 text-left"
+                      className="inline-flex items-center gap-2 text-left text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
                     >
                       <LogOut className="h-5 w-5" />
                       Log out
@@ -221,35 +231,32 @@ export function HomeHeader() {
                   </>
                 )}
                 {!isLoggedIn && (
-                  <div className="pt-4 flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3 pt-4">
                     <Link
-                      href="/login"
+                      href="/auth/signup"
                       onClick={() => setOpen(false)}
-                      className="text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                      className={cn(
+                        "inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold",
+                        "border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                      )}
+                    >
+                      Sign Up
+                    </Link>
+                    <Link
+                      href="/auth/login"
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold",
+                        "bg-[#34A853] text-white shadow-sm transition hover:bg-[#2d9249]"
+                      )}
                     >
                       Login
                     </Link>
-                    <Link href="/signup" onClick={() => setOpen(false)}>
-                      <Button className="w-full bg-white/10 text-white hover:bg-white/15 font-semibold uppercase">
-                        Sign up
-                      </Button>
-                    </Link>
                   </div>
                 )}
-                <Link href="#enroll" onClick={() => setOpen(false)} className="pt-4">
-                  <Button className="w-full bg-gold text-gold-foreground hover:bg-gold/90 font-semibold uppercase">
-                    Enroll Now
-                  </Button>
-                </Link>
               </nav>
             </SheetContent>
           </Sheet>
-          <Button
-            asChild
-            className="bg-gold text-gold-foreground hover:bg-gold/90 font-semibold uppercase tracking-wide px-6 max-md:hidden"
-          >
-            <Link href="#enroll">Enroll Now</Link>
-          </Button>
         </div>
       </div>
     </header>

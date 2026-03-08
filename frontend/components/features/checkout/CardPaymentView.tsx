@@ -121,21 +121,30 @@ export function CardPaymentView() {
               throw err;
             });
         },
-        onApprove: function (
-          data: unknown,
-          actions: { order: { capture: () => Promise<unknown> } }
-        ) {
+        onApprove: function (data: unknown) {
           const orderID =
             typeof data === "object" && data !== null && "orderID" in data
               ? String((data as { orderID: string }).orderID)
               : "";
-          return actions.order.capture().then(async () => {
-            const order = pendingPayPalOrderRef.current;
-            if (order) {
-              await confirmPayment({ orderId: order.id, transactionId: orderID });
-            }
-            router.push("/dashboard/orders?from=checkout");
-          });
+          const order = pendingPayPalOrderRef.current;
+          if (!order || !orderID) {
+            const err = new Error("Missing PayPal order details.");
+            setCheckoutError("PayPal payment failed. Please try again or choose bank transfer.");
+            return Promise.reject(err);
+          }
+          return confirmPayment({ orderId: order.id, transactionId: orderID })
+            .then(() => {
+              router.push("/dashboard/orders?from=checkout");
+            })
+            .catch((err: unknown) => {
+              setCheckoutError(
+                getErrorMessage(
+                  err,
+                  "PayPal payment failed. Please try again or choose bank transfer."
+                )
+              );
+              throw err;
+            });
         },
         onError: function (err: unknown) {
           console.error("PayPal error:", err);

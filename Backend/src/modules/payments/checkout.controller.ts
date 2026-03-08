@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Post, Req, UseGuards, UsePipes } from '@nestjs/common';
+import { BadRequestException, Body, Controller, NotFoundException, Post, Req, UseGuards, UsePipes } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { RequestUser } from '../../common/auth/current-user.decorator';
@@ -115,7 +115,7 @@ export class CheckoutController {
   async confirm(@Body() body: ConfirmPaymentBody) {
     const order = await this.orders.findById(body.orderId);
     if (!order) {
-      throw new Error('Order not found');
+      throw new NotFoundException('Order not found');
     }
     if (order.status !== 'pending') {
       throw new BadRequestException(
@@ -123,7 +123,17 @@ export class CheckoutController {
       );
     }
     if (body.transactionId && order.provider !== 'manual') {
-      await this.paypalCapture.captureOrder(body.transactionId);
+      try {
+        await this.paypalCapture.captureOrder(body.transactionId);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'PayPal capture failed';
+        throw new BadRequestException(
+          message.startsWith('PAYPAL_')
+            ? 'PayPal is not configured. Please use bank transfer.'
+            : 'PayPal payment failed. Please try again or choose bank transfer.',
+        );
+      }
     }
     const updated = await this.orders.updateStatus({
       orderId: body.orderId,
@@ -131,7 +141,7 @@ export class CheckoutController {
       transactionId: body.transactionId,
     });
     if (!updated) {
-      throw new Error('Order not found');
+      throw new NotFoundException('Order not found');
     }
     if (updated.status === 'paid' && updated.promoCode?.trim()) {
       await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());

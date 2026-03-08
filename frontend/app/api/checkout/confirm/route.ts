@@ -36,8 +36,16 @@ export async function POST(req: Request) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        const status =
+          res.status === 401
+            ? 401
+            : res.status === 404
+              ? 404
+              : res.status >= 500
+                ? 500
+                : 400;
         return jsonError(
-          res.status === 401 ? 401 : res.status === 404 ? 404 : 400,
+          status,
           (data?.message as string) ?? "Payment confirmation failed",
           { requestId }
         );

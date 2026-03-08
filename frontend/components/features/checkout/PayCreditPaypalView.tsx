@@ -117,16 +117,24 @@ export function PayCreditPaypalView() {
               })
               .then((order) => order.id);
           },
-          onApprove: function (
-            _data: unknown,
-            actions: { order: { capture: () => Promise<unknown> } }
-          ) {
-            return actions.order.capture().then(() => {
-              if (order) {
-                void confirmPayment({ orderId: order.id, transactionId: `PP-${Date.now()}` });
-              }
-              window.location.href = "/dashboard/orders";
-            });
+          onApprove: function (data: unknown) {
+            const paypalOrderId =
+              typeof data === "object" && data !== null && "orderID" in data
+                ? String((data as { orderID: string }).orderID)
+                : "";
+            if (!order || !paypalOrderId) {
+              const err = new Error("Missing PayPal order details.");
+              setError("PayPal payment failed. Please try again or choose bank transfer.");
+              return Promise.reject(err);
+            }
+            return confirmPayment({ orderId: order.id, transactionId: paypalOrderId })
+              .then(() => {
+                window.location.href = "/dashboard/orders";
+              })
+              .catch((err: unknown) => {
+                setError(getErrorMessage(err, "PayPal payment failed. Please try again or choose bank transfer."));
+                throw err;
+              });
           },
           onError: function (err) {
             console.error("PayPal error:", err);
@@ -243,7 +251,7 @@ export function PayCreditPaypalView() {
                       e.preventDefault();
                       if (!order) return;
                       try {
-                        await confirmPayment({ orderId: order.id, transactionId: `CARD-${Date.now()}` });
+                        await confirmPayment({ orderId: order.id });
                         router.push("/dashboard/orders");
                       } catch (e2) {
                         setError(getErrorMessage(e2, "Payment failed"));

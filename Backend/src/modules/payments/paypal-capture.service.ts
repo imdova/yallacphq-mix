@@ -1,17 +1,23 @@
 import { Injectable } from '@nestjs/common';
-
-const PAYPAL_API_BASE = process.env.PAYPAL_API_BASE ?? 'https://api.paypal.com';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PaypalCaptureService {
+  constructor(private readonly config: ConfigService) {}
+
+  private getPaypalApiBase(): string {
+    return this.config.get<string>('PAYPAL_API_BASE') ?? 'https://api.paypal.com';
+  }
+
   private async getAccessToken(): Promise<string> {
-    const clientId = process.env.PAYPAL_CLIENT_ID;
-    const secret = process.env.PAYPAL_SECRET;
-    if (!clientId || !secret) {
+    const clientId = this.config.get<string>('PAYPAL_CLIENT_ID');
+    const secret = this.config.get<string>('PAYPAL_SECRET');
+    if (!clientId?.trim() || !secret?.trim()) {
       throw new Error('PAYPAL_CLIENT_ID and PAYPAL_SECRET must be set to capture PayPal orders');
     }
     const auth = Buffer.from(`${clientId}:${secret}`).toString('base64');
-    const res = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+    const base = this.getPaypalApiBase();
+    const res = await fetch(`${base}/v1/oauth2/token`, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
@@ -32,7 +38,8 @@ export class PaypalCaptureService {
 
   async captureOrder(paypalOrderId: string): Promise<void> {
     const token = await this.getAccessToken();
-    const res = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
+    const base = this.getPaypalApiBase();
+    const res = await fetch(`${base}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

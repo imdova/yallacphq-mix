@@ -4,7 +4,7 @@ const defaultOptions = {
   categories: ["Exam Prep", "Quality Management", "Patient Safety", "Free Resource", "Data Analysis", "Compliance"] as string[],
 };
 
-let store = { ...defaultOptions };
+const store = { ...defaultOptions };
 
 export function getStudentFieldOptions(): { countries: string[]; specialities: string[]; categories: string[] } {
   return {

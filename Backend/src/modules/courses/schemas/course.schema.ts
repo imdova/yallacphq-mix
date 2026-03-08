@@ -3,6 +3,71 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type CourseDocument = HydratedDocument<Course>;
 
+@Schema({ _id: false })
+export class CourseReviewMediaItem {
+  @Prop({ required: true })
+  id!: string;
+
+  @Prop({ required: true, enum: ['image', 'video', 'youtube'] })
+  kind!: 'image' | 'video' | 'youtube';
+
+  @Prop({ required: true })
+  src!: string;
+
+  @Prop()
+  caption?: string;
+
+  @Prop()
+  poster?: string;
+}
+
+export const CourseReviewMediaItemSchema =
+  SchemaFactory.createForClass(CourseReviewMediaItem);
+
+@Schema({ _id: false })
+export class CurriculumItem {
+  @Prop({ required: true })
+  id!: string;
+
+  @Prop({ required: true, enum: ['lecture', 'quiz'] })
+  type!: 'lecture' | 'quiz';
+
+  @Prop({ required: true })
+  title!: string;
+
+  @Prop()
+  videoUrl?: string;
+
+  @Prop()
+  materialUrl?: string;
+
+  @Prop()
+  materialFileName?: string;
+
+  @Prop()
+  freeLecture?: boolean;
+}
+
+export const CurriculumItemSchema = SchemaFactory.createForClass(CurriculumItem);
+
+@Schema({ _id: false })
+export class CurriculumSection {
+  @Prop({ required: true })
+  id!: string;
+
+  @Prop({ required: true })
+  title!: string;
+
+  @Prop()
+  description?: string;
+
+  @Prop({ type: [CurriculumItemSchema], default: undefined })
+  items?: CurriculumItem[];
+}
+
+export const CurriculumSectionSchema =
+  SchemaFactory.createForClass(CurriculumSection);
+
 @Schema({ timestamps: true })
 export class Course {
   @Prop({ required: true, trim: true })
@@ -108,6 +173,24 @@ export class Course {
 
   @Prop()
   seoKeywords?: string;
+
+  @Prop({ type: [String], default: undefined })
+  learningOutcomes?: string[];
+
+  @Prop({ type: [CurriculumSectionSchema], default: undefined })
+  curriculumSections?: CurriculumSection[];
+
+  @Prop({ type: [CourseReviewMediaItemSchema], default: undefined })
+  reviewMedia?: CourseReviewMediaItem[];
+
+  @Prop({ default: false })
+  featured?: boolean;
+
+  @Prop({ min: 0 })
+  featuredOrder?: number;
+
+  @Prop({ type: [String], default: undefined })
+  relatedCourseIds?: string[];
 
   @Prop({ type: Types.ObjectId, required: false })
   createdByUserId?: Types.ObjectId;

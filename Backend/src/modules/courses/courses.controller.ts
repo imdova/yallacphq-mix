@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
   Version,
@@ -54,6 +55,24 @@ export class CoursesController {
     return { items: items.map(toApiCourse) };
   }
 
+  @Get('featured')
+  @Version('1')
+  @ResponseSchema(publicCoursesResponseSchema)
+  @ApiOperation({ summary: 'List featured public courses' })
+  @ApiOkResponse({ type: PublicCoursesResponseDto })
+  async listFeatured(
+    @Query('limit') limitRaw?: string,
+  ) {
+    const limit = Number.isFinite(Number(limitRaw))
+      ? Math.max(1, Math.min(24, Number(limitRaw)))
+      : 12;
+    let items = await this.courses.listFeaturedPublished(limit);
+    if (items.length === 0) {
+      items = await this.courses.listPublished(limit);
+    }
+    return { items: items.map(toApiCourse) };
+  }
+
   @Get('mine')
   @Version('1')
   @UseGuards(JwtAuthGuard)
@@ -72,13 +91,35 @@ export class CoursesController {
     return { items };
   }
 
+  @Get(':id/related')
+  @Version('1')
+  @ResponseSchema(publicCoursesResponseSchema)
+  @ApiOperation({ summary: 'List related public courses' })
+  @ApiParam({ name: 'id', example: '65f3c77b0f6d1b5a3d1d9a10' })
+  @ApiOkResponse({ type: PublicCoursesResponseDto })
+  async getRelated(
+    @Param('id') id: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const course = await this.courses.findPublishedById(id);
+    if (!course) throw new NotFoundException('Course not found');
+    const limit = Number.isFinite(Number(limitRaw))
+      ? Math.max(1, Math.min(12, Number(limitRaw)))
+      : 4;
+    const items = await this.courses.listRelatedPublishedForCourse(
+      course,
+      limit,
+    );
+    return { items: items.map(toApiCourse) };
+  }
+
   @Get(':id')
   @Version('1')
   @ResponseSchema(publicCourseResponseSchema)
   @ApiOperation({ summary: 'Get public course by id' })
   @ApiParam({ name: 'id', example: '65f3c77b0f6d1b5a3d1d9a10' })
   async getPublicById(@Param('id') id: string) {
-    const course = await this.courses.findById(id);
+    const course = await this.courses.findPublishedById(id);
     if (!course) throw new NotFoundException('Course not found');
     return { course: toApiCourse(course) };
   }

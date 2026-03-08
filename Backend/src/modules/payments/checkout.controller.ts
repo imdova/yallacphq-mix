@@ -117,6 +117,11 @@ export class CheckoutController {
     if (!order) {
       throw new Error('Order not found');
     }
+    if (order.status !== 'pending') {
+      throw new BadRequestException(
+        `Order cannot be confirmed from status "${order.status}".`,
+      );
+    }
     if (body.transactionId && order.provider !== 'manual') {
       await this.paypalCapture.captureOrder(body.transactionId);
     }

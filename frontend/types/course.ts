@@ -1,6 +1,40 @@
 export type CourseLevel = "Beginner" | "Intermediate" | "Advanced";
 export type DurationRange = "0-2 Hours" | "3-6 Hours" | "6+ Hours";
 export type CertificationType = "CPHQ Prep" | "CME Credits" | "Micro-Credential";
+export type CourseReviewMediaKind = "image" | "video" | "youtube";
+
+export interface CourseReviewMediaItem {
+  id: string;
+  kind: CourseReviewMediaKind;
+  src: string;
+  caption?: string;
+  poster?: string;
+}
+
+export interface CourseCurriculumLecture {
+  id: string;
+  type: "lecture";
+  title: string;
+  videoUrl?: string;
+  materialUrl?: string;
+  materialFileName?: string;
+  freeLecture?: boolean;
+}
+
+export interface CourseCurriculumQuiz {
+  id: string;
+  type: "quiz";
+  title: string;
+}
+
+export type CourseCurriculumItem = CourseCurriculumLecture | CourseCurriculumQuiz;
+
+export interface CourseCurriculumSection {
+  id: string;
+  title: string;
+  description?: string;
+  items?: CourseCurriculumItem[];
+}
 
 export interface Course {
   id: string;
@@ -38,6 +72,12 @@ export interface Course {
   seoTitle?: string;
   seoDescription?: string;
   seoKeywords?: string;
+  learningOutcomes?: string[];
+  curriculumSections?: CourseCurriculumSection[];
+  reviewMedia?: CourseReviewMediaItem[];
+  featured?: boolean;
+  featuredOrder?: number;
+  relatedCourseIds?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -73,6 +113,12 @@ export interface CreateCourseInput {
   seoTitle?: string;
   seoDescription?: string;
   seoKeywords?: string;
+  learningOutcomes?: string[];
+  curriculumSections?: CourseCurriculumSection[];
+  reviewMedia?: CourseReviewMediaItem[];
+  featured?: boolean;
+  featuredOrder?: number;
+  relatedCourseIds?: string[];
 }
 
 export type UpdateCourseInput = Partial<CreateCourseInput>;

@@ -78,6 +78,9 @@ const baseCourseSchema = z.object({
   seoTitle: z.string().max(60).optional(),
   seoDescription: z.string().max(160).optional(),
   seoKeywords: z.string().max(500).optional(),
+  learningOutcomesText: z.string().max(4000).optional(),
+  featured: z.boolean().optional(),
+  featuredOrder: z.coerce.number().int().min(0, "Featured order must be 0 or more").optional(),
 });
 
 export const createCourseSchema = baseCourseSchema.superRefine((val, ctx) => {

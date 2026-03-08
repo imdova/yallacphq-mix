@@ -2,7 +2,7 @@ import { base64UrlDecode, base64UrlEncode } from "./base64url";
 
 export const SESSION_COOKIE_NAME = "yalla_session";
 
-export type SessionRole = "admin" | "member" | "viewer";
+export type SessionRole = "admin" | "student" | "member" | "viewer";
 
 export type SessionPayload = {
   uid: string;

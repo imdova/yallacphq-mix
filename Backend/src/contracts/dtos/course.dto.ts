@@ -5,6 +5,60 @@ export enum CourseStatusDto {
   published = 'published',
 }
 
+export class CourseReviewMediaItemDto {
+  @ApiProperty({ example: 'review-1' })
+  id!: string;
+
+  @ApiProperty({ enum: ['image', 'video', 'youtube'], example: 'youtube' })
+  kind!: string;
+
+  @ApiProperty({ example: 'https://www.youtube.com/watch?v=123' })
+  src!: string;
+
+  @ApiProperty({ required: false, example: 'Student video feedback' })
+  caption?: string;
+
+  @ApiProperty({ required: false, example: 'https://example.com/poster.jpg' })
+  poster?: string;
+}
+
+export class CurriculumItemDto {
+  @ApiProperty({ example: 'item-1' })
+  id!: string;
+
+  @ApiProperty({ enum: ['lecture', 'quiz'], example: 'lecture' })
+  type!: string;
+
+  @ApiProperty({ example: 'Introduction to CPHQ' })
+  title!: string;
+
+  @ApiProperty({ required: false, example: 'https://www.youtube.com/watch?v=123' })
+  videoUrl?: string;
+
+  @ApiProperty({ required: false, example: 'https://example.com/handout.pdf' })
+  materialUrl?: string;
+
+  @ApiProperty({ required: false, example: 'Handout.pdf' })
+  materialFileName?: string;
+
+  @ApiProperty({ required: false, example: true })
+  freeLecture?: boolean;
+}
+
+export class CurriculumSectionDto {
+  @ApiProperty({ example: 'section-1' })
+  id!: string;
+
+  @ApiProperty({ example: 'Module 1: Foundations' })
+  title!: string;
+
+  @ApiProperty({ required: false, example: 'Core concepts for exam readiness.' })
+  description?: string;
+
+  @ApiProperty({ type: [CurriculumItemDto] })
+  items!: CurriculumItemDto[];
+}
+
 export class ApiCourseDto {
   @ApiProperty({ example: '65f3c77b0f6d1b5a3d1d9a10' })
   id!: string;
@@ -70,8 +124,80 @@ export class ApiCourseDto {
   @ApiProperty({ required: false, example: 299 })
   priceSale?: number;
 
+  @ApiProperty({
+    required: false,
+    enum: ['permanent', '1_month', '3_months', '6_months', '1_year', 'custom'],
+    example: 'permanent',
+  })
+  availability?: string;
+
+  @ApiProperty({ required: false, example: false })
+  enablePromoCode?: boolean;
+
   @ApiProperty({ required: false, example: 'usd' })
   currency?: string;
+
+  @ApiProperty({ required: false, example: 25 })
+  discountPercent?: number;
+
+  @ApiProperty({
+    required: false,
+    enum: ['Beginner', 'Intermediate', 'Advanced'],
+    example: 'Intermediate',
+  })
+  level?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ['CPHQ Prep', 'CME Credits', 'Micro-Credential'],
+    example: 'CPHQ Prep',
+  })
+  certificationType?: string;
+
+  @ApiProperty({ required: false, example: 'Course cover placeholder' })
+  imagePlaceholder?: string;
+
+  @ApiProperty({ required: false, example: 'https://example.com/course.jpg' })
+  imageUrl?: string;
+
+  @ApiProperty({ required: false, example: 'https://example.com/instructor.jpg' })
+  instructorImageUrl?: string;
+
+  @ApiProperty({ required: false, example: 'https://www.youtube.com/watch?v=123' })
+  videoPreviewUrl?: string;
+
+  @ApiProperty({ required: false, example: 'CPHQ Program | Yalla CPHQ' })
+  seoTitle?: string;
+
+  @ApiProperty({ required: false, example: 'Prepare for the CPHQ exam with expert-led training.' })
+  seoDescription?: string;
+
+  @ApiProperty({ required: false, example: 'cphq, healthcare quality, patient safety' })
+  seoKeywords?: string;
+
+  @ApiProperty({ required: false, type: [String], example: ['Master exam domains', 'Apply quality tools'] })
+  learningOutcomes?: string[];
+
+  @ApiProperty({ required: false, type: [CurriculumSectionDto] })
+  curriculumSections?: CurriculumSectionDto[];
+
+  @ApiProperty({ required: false, type: [CourseReviewMediaItemDto] })
+  reviewMedia?: CourseReviewMediaItemDto[];
+
+  @ApiProperty({ required: false, example: true })
+  featured?: boolean;
+
+  @ApiProperty({ required: false, example: 1 })
+  featuredOrder?: number;
+
+  @ApiProperty({ required: false, type: [String], example: ['65f3c77b0f6d1b5a3d1d9a11'] })
+  relatedCourseIds?: string[];
+
+  @ApiProperty({ required: false, example: '2026-03-05T10:00:00.000Z' })
+  createdAt?: string;
+
+  @ApiProperty({ required: false, example: '2026-03-05T10:00:00.000Z' })
+  updatedAt?: string;
 }
 
 export class CreateCourseBodyDto {
@@ -175,6 +301,28 @@ export class CreateCourseBodyDto {
 
   @ApiProperty({ required: false, description: 'SEO keywords' })
   seoKeywords?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    example: ['Master exam domains', 'Build quality dashboards'],
+  })
+  learningOutcomes?: string[];
+
+  @ApiProperty({ required: false, type: [CurriculumSectionDto] })
+  curriculumSections?: CurriculumSectionDto[];
+
+  @ApiProperty({ required: false, type: [CourseReviewMediaItemDto] })
+  reviewMedia?: CourseReviewMediaItemDto[];
+
+  @ApiProperty({ required: false, example: true, description: 'Show this course in featured sections' })
+  featured?: boolean;
+
+  @ApiProperty({ required: false, example: 1, description: 'Lower numbers appear first in featured lists' })
+  featuredOrder?: number;
+
+  @ApiProperty({ required: false, type: [String], description: 'Explicitly related course ids' })
+  relatedCourseIds?: string[];
 }
 
 export class ListCoursesResponseDto {

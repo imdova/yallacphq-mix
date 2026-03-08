@@ -353,7 +353,7 @@ export function AdminCourseDetailsView() {
     course.imageUrl?.startsWith("data:") || course.imageUrl?.startsWith("http")
       ? course.imageUrl
       : undefined;
-  const publicPreviewHref = `/course-details?courseId=${encodeURIComponent(course.id)}`;
+  const publicPreviewHref = `/course-details?course=${encodeURIComponent(course.id)}`;
   const aov = orderStats.paid > 0 ? orderStats.revenue / orderStats.paid : 0;
 
   return (

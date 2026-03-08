@@ -7,6 +7,7 @@ import { UsersModule } from '../users/users.module';
 import { OrdersController } from './orders.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { OrdersService } from './orders.service';
+import { PendingOrdersExpiryJob } from './pending-orders-expiry.job';
 import { Order, OrderSchema } from './schemas/order.schema';
 
 @Module({
@@ -18,7 +19,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
     PromoCodesModule,
   ],
   controllers: [OrdersController, AdminOrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, PendingOrdersExpiryJob],
   exports: [OrdersService],
 })
 export class OrdersModule {}

@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import type { Course } from "@/types/course";
 import { adminCourseCreateSchema } from "@/lib/validations/course";
-import { createCourse, fetchCourseById, updateCourse } from "@/lib/dal/courses";
+import { createCourse, fetchCourseById, fetchCourses, updateCourse } from "@/lib/dal/courses";
 import { getStudentFieldOptions } from "@/lib/dal/settings";
 import { uploadCourseImage } from "@/lib/dal/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +72,12 @@ const AVAILABILITY_OPTIONS = [
 
 const CURRENCY_OPTIONS = [{ value: "USD", label: "USD" }] as const;
 
+const CERTIFICATION_OPTIONS = [
+  { value: "CPHQ Prep", label: "CPHQ Prep" },
+  { value: "CME Credits", label: "CME Credits" },
+  { value: "Micro-Credential", label: "Micro-Credential" },
+] as const;
+
 function nextId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -100,6 +106,103 @@ export interface CurriculumSection {
   title: string;
   description: string;
   items: CurriculumItem[];
+}
+
+export interface ReviewMediaFormItem {
+  id: string;
+  kind: "image" | "video" | "youtube";
+  src: string;
+  caption: string;
+  poster: string;
+}
+
+function parseMultilineList(input?: string): string[] {
+  if (!input) return [];
+  return Array.from(
+    new Set(
+      input
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function mapCurriculumSections(course: Course): CurriculumSection[] {
+  return (course.curriculumSections ?? []).map((section) => ({
+    id: section.id,
+    title: section.title,
+    description: section.description ?? "",
+    items: (section.items ?? []).map((item) =>
+      item.type === "lecture"
+        ? {
+            id: item.id,
+            type: "lecture" as const,
+            title: item.title,
+            videoUrl: item.videoUrl ?? "",
+            materialUrl: item.materialUrl ?? "",
+            materialFileName: item.materialFileName,
+            materialDataUrl: undefined,
+            freeLecture: item.freeLecture ?? false,
+          }
+        : {
+            id: item.id,
+            type: "quiz" as const,
+            title: item.title,
+          }
+    ),
+  }));
+}
+
+function mapReviewMediaItems(course: Course): ReviewMediaFormItem[] {
+  return (course.reviewMedia ?? []).map((item) => ({
+    id: item.id,
+    kind: item.kind,
+    src: item.src,
+    caption: item.caption ?? "",
+    poster: item.poster ?? "",
+  }));
+}
+
+function serializeCurriculumSections(sections: CurriculumSection[]) {
+  return sections
+    .map((section) => ({
+      id: section.id,
+      title: section.title.trim(),
+      description: section.description.trim() || undefined,
+      items: section.items
+        .map((item) =>
+          item.type === "lecture"
+            ? {
+                id: item.id,
+                type: "lecture" as const,
+                title: item.title.trim(),
+                videoUrl: item.videoUrl.trim() || undefined,
+                materialUrl: item.materialUrl.trim() || undefined,
+                materialFileName: item.materialFileName,
+                freeLecture: item.freeLecture,
+              }
+            : {
+                id: item.id,
+                type: "quiz" as const,
+                title: item.title.trim(),
+              }
+        )
+        .filter((item) => item.title.length > 0),
+    }))
+    .filter((section) => section.title.length > 0);
+}
+
+function serializeReviewMedia(items: ReviewMediaFormItem[]) {
+  return items
+    .map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      src: item.src.trim(),
+      caption: item.caption.trim() || undefined,
+      poster: item.poster.trim() || undefined,
+    }))
+    .filter((item) => item.src.length > 0);
 }
 
 function courseToFormValues(course: Course): FormValues {
@@ -136,6 +239,9 @@ function courseToFormValues(course: Course): FormValues {
     socialSharing: course.socialSharing ?? false,
     certificationType: course.certificationType,
     imagePlaceholder: course.imagePlaceholder ?? "",
+    learningOutcomesText: (course.learningOutcomes ?? []).join("\n"),
+    featured: course.featured ?? false,
+    featuredOrder: course.featuredOrder ?? 0,
   };
 }
 
@@ -160,6 +266,9 @@ export default function AdminCourseNewPage() {
   const [expandedLectureIds, setExpandedLectureIds] = React.useState<Set<string>>(new Set());
   const [materialUploadForLectureId, setMaterialUploadForLectureId] = React.useState<string | null>(null);
   const [seoKeywordInput, setSeoKeywordInput] = React.useState("");
+  const [availableCourses, setAvailableCourses] = React.useState<Course[]>([]);
+  const [selectedRelatedCourseIds, setSelectedRelatedCourseIds] = React.useState<string[]>([]);
+  const [reviewMediaItems, setReviewMediaItems] = React.useState<ReviewMediaFormItem[]>([]);
 
   React.useEffect(() => {
     getStudentFieldOptions()
@@ -168,6 +277,9 @@ export default function AdminCourseNewPage() {
         setCategoryOptions(list);
       })
       .catch(() => setCategoryOptions(FALLBACK_CATEGORIES));
+    fetchCourses()
+      .then((items) => setAvailableCourses(items))
+      .catch(() => setAvailableCourses([]));
   }, []);
 
   const STEPS = [
@@ -205,6 +317,14 @@ export default function AdminCourseNewPage() {
       seoTitle: "",
       seoDescription: "",
       seoKeywords: "",
+      enableEnrollment: true,
+      requireApproval: false,
+      socialSharing: false,
+      certificationType: "CPHQ Prep",
+      imagePlaceholder: "",
+      learningOutcomesText: "",
+      featured: false,
+      featuredOrder: 0,
     },
     mode: "onSubmit",
   });
@@ -221,6 +341,9 @@ export default function AdminCourseNewPage() {
     if (!editId) {
       setLoadingEdit(false);
       setLoadError(null);
+      setCurriculumSections([]);
+      setSelectedRelatedCourseIds([]);
+      setReviewMediaItems([]);
       return;
     }
     setLoadError(null);
@@ -229,12 +352,21 @@ export default function AdminCourseNewPage() {
       .then((course) => {
         if (course) {
           methods.reset(courseToFormValues(course));
+          setCurriculumSections(mapCurriculumSections(course));
+          setSelectedRelatedCourseIds(course.relatedCourseIds ?? []);
+          setReviewMediaItems(mapReviewMediaItems(course));
         } else {
           setLoadError("Course not found.");
+          setCurriculumSections([]);
+          setSelectedRelatedCourseIds([]);
+          setReviewMediaItems([]);
         }
       })
       .catch((e) => {
         setLoadError(e instanceof Error ? e.message : "Failed to load course.");
+        setCurriculumSections([]);
+        setSelectedRelatedCourseIds([]);
+        setReviewMediaItems([]);
       })
       .finally(() => setLoadingEdit(false));
   }, [editId, methods]);
@@ -418,7 +550,44 @@ export default function AdminCourseNewPage() {
     reader.readAsDataURL(file);
   };
 
+  const relatedCourseOptions = React.useMemo(
+    () => availableCourses.filter((course) => course.id !== editId),
+    [availableCourses, editId]
+  );
+
+  const toggleRelatedCourse = (courseIdToToggle: string, checked: boolean) => {
+    setSelectedRelatedCourseIds((prev) =>
+      checked
+        ? Array.from(new Set([...prev, courseIdToToggle]))
+        : prev.filter((id) => id !== courseIdToToggle)
+    );
+  };
+
+  const addReviewMediaItem = () => {
+    setReviewMediaItems((prev) => [
+      ...prev,
+      { id: nextId(), kind: "youtube", src: "", caption: "", poster: "" },
+    ]);
+  };
+
+  const updateReviewMediaItem = (
+    itemId: string,
+    updates: Partial<Omit<ReviewMediaFormItem, "id">>
+  ) => {
+    setReviewMediaItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...updates } : item))
+    );
+  };
+
+  const removeReviewMediaItem = (itemId: string) => {
+    setReviewMediaItems((prev) => prev.filter((item) => item.id !== itemId));
+  };
+
   const submit = methods.handleSubmit(async (data) => {
+    const curriculumPayload = serializeCurriculumSections(curriculumSections);
+    const reviewMediaPayload = serializeReviewMedia(reviewMediaItems);
+    const relatedCourseIds = selectedRelatedCourseIds.filter((id) => id !== editId);
+    const learningOutcomes = parseMultilineList(data.learningOutcomesText);
     const payload = {
       title: data.title,
       tag: data.tag,
@@ -437,16 +606,27 @@ export default function AdminCourseNewPage() {
       currency: data.currency,
       discountPercent: data.discountPercent,
       level: data.level,
+      enableEnrollment: data.enableEnrollment ?? true,
+      requireApproval: data.requireApproval ?? false,
+      socialSharing: data.socialSharing ?? false,
+      certificationType: data.certificationType,
       enrolledCount: data.enrolledCount ?? 0,
       rating: data.rating,
       reviewCount: data.reviewCount,
       lessons: data.lessons,
+      imagePlaceholder: data.imagePlaceholder?.trim() || undefined,
       imageUrl: data.imageUrl?.trim() || undefined,
       instructorImageUrl: data.instructorImageUrl?.trim() || undefined,
       videoPreviewUrl: data.videoPreviewUrl?.trim() || undefined,
       seoTitle: data.seoTitle?.trim() || undefined,
       seoDescription: data.seoDescription?.trim() || undefined,
       seoKeywords: data.seoKeywords?.trim() || undefined,
+      learningOutcomes: learningOutcomes.length ? learningOutcomes : undefined,
+      curriculumSections: curriculumPayload.length ? curriculumPayload : undefined,
+      reviewMedia: reviewMediaPayload.length ? reviewMediaPayload : undefined,
+      featured: data.featured ?? false,
+      featuredOrder: data.featured ? data.featuredOrder ?? 0 : undefined,
+      relatedCourseIds: relatedCourseIds.length ? relatedCourseIds : undefined,
     };
     if (editId) {
       await updateCourse(editId, payload);
@@ -1039,6 +1219,167 @@ export default function AdminCourseNewPage() {
                 </Card>
               </div>
 
+              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Course page content</CardTitle>
+                  <CardDescription>
+                    Content that powers the public course details page from backend data.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 pt-0">
+                  <FormField name="learningOutcomesText" label="Learning outcomes">
+                    {({ id, error, ...rest }) => (
+                      <textarea
+                        id={id}
+                        aria-invalid={!!error}
+                        aria-describedby={error ? `${id}-error` : undefined}
+                        className={cn(
+                          "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                          "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                          error && "border-destructive focus-visible:ring-destructive"
+                        )}
+                        placeholder={"Add one learning outcome per line.\nExample:\nMaster the 5 CPHQ exam domains\nApply patient safety tools in real scenarios"}
+                        {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                      />
+                    )}
+                  </FormField>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormSelect
+                      name="certificationType"
+                      label="Certification type"
+                      options={CERTIFICATION_OPTIONS as unknown as { value: string; label: string }[]}
+                      placeholder="Select certification type"
+                    />
+                    <FormField name="imagePlaceholder" label="Image placeholder (optional)">
+                      {({ id, error, ...rest }) => (
+                        <FormInput
+                          id={id}
+                          error={error}
+                          placeholder="Fallback text for cover image"
+                          className="rounded-xl border-zinc-200"
+                          {...rest}
+                        />
+                      )}
+                    </FormField>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Discovery &amp; enrollment</CardTitle>
+                  <CardDescription>
+                    Control visibility, featured placement, and related course recommendations.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-0">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">Enable enrollment</p>
+                        <p className="text-xs text-zinc-500">Allow students to enroll or checkout for this course.</p>
+                      </div>
+                      <Switch
+                        checked={methods.watch("enableEnrollment") ?? true}
+                        onCheckedChange={(checked) => methods.setValue("enableEnrollment", !!checked, { shouldDirty: true })}
+                        className="data-[state=checked]:bg-emerald-500"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">Require approval</p>
+                        <p className="text-xs text-zinc-500">Mark the course as approval-based before access is granted.</p>
+                      </div>
+                      <Switch
+                        checked={methods.watch("requireApproval") ?? false}
+                        onCheckedChange={(checked) => methods.setValue("requireApproval", !!checked, { shouldDirty: true })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">Social sharing</p>
+                        <p className="text-xs text-zinc-500">Enable social sharing treatment for this course.</p>
+                      </div>
+                      <Switch
+                        checked={methods.watch("socialSharing") ?? false}
+                        onCheckedChange={(checked) => methods.setValue("socialSharing", !!checked, { shouldDirty: true })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">Featured course</p>
+                        <p className="text-xs text-zinc-500">Show this course in featured sections on the public site.</p>
+                      </div>
+                      <Switch
+                        checked={methods.watch("featured") ?? false}
+                        onCheckedChange={(checked) => methods.setValue("featured", !!checked, { shouldDirty: true })}
+                        className="data-[state=checked]:bg-gold"
+                      />
+                    </div>
+                  </div>
+
+                  {methods.watch("featured") ? (
+                    <FormField name="featuredOrder" label="Featured order">
+                      {({ id, error, ...rest }) => (
+                        <FormInput
+                          id={id}
+                          error={error}
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="0"
+                          className="rounded-xl border-zinc-200"
+                          {...rest}
+                        />
+                      )}
+                    </FormField>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900">Related courses</p>
+                        <p className="text-xs text-zinc-500">
+                          Select the courses to recommend on this course&apos;s details page.
+                        </p>
+                      </div>
+                      <span className="text-xs font-medium text-zinc-500">
+                        {selectedRelatedCourseIds.length} selected
+                      </span>
+                    </div>
+
+                    {relatedCourseOptions.length > 0 ? (
+                      <div className="max-h-60 space-y-2 overflow-auto rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
+                        {relatedCourseOptions.map((courseOption) => (
+                          <label
+                            key={courseOption.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent bg-white p-3 transition hover:border-zinc-200"
+                          >
+                            <Checkbox
+                              checked={selectedRelatedCourseIds.includes(courseOption.id)}
+                              onCheckedChange={(checked) => toggleRelatedCourse(courseOption.id, !!checked)}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-zinc-900">
+                                {courseOption.title}
+                              </p>
+                              <p className="text-xs text-zinc-500">
+                                {courseOption.tag} {courseOption.status ? `· ${courseOption.status}` : ""}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
+                        Create more courses first, then you can link them here as related courses.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="flex items-center justify-between">
                 <p className="text-xs text-zinc-500">
                   Tip: Keep the description short, clear, and exam-focused.
@@ -1050,6 +1391,9 @@ export default function AdminCourseNewPage() {
                     className="rounded-xl border-zinc-200"
                     onClick={() => {
                       methods.reset();
+                      setCurriculumSections([]);
+                      setSelectedRelatedCourseIds([]);
+                      setReviewMediaItems([]);
                       router.push("/admin/courses");
                     }}
                   >
@@ -1070,7 +1414,7 @@ export default function AdminCourseNewPage() {
                     className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
                   >
                     <Check className="h-4 w-4" />
-                    Create course
+                    {editId ? "Save changes" : "Create course"}
                   </Button>
                 </div>
               </div>
@@ -1357,6 +1701,116 @@ export default function AdminCourseNewPage() {
                   <Plus className="mr-2 h-4 w-4" />
                   Add Section
                 </Button>
+
+                <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Student review media</CardTitle>
+                    <CardDescription>
+                      Add image, video, or YouTube review items for the public course page gallery.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-0">
+                    {reviewMediaItems.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
+                        No review media added yet.
+                      </div>
+                    ) : null}
+
+                    {reviewMediaItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-zinc-900">
+                              Media item {index + 1}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              Add a hosted image/video URL or a YouTube link.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-zinc-500 hover:text-destructive"
+                            onClick={() => removeReviewMediaItem(item.id)}
+                            aria-label="Remove review media item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-zinc-700">Type</label>
+                            <select
+                              value={item.kind}
+                              onChange={(e) =>
+                                updateReviewMediaItem(item.id, {
+                                  kind: e.target.value as ReviewMediaFormItem["kind"],
+                                })
+                              }
+                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                            >
+                              <option value="youtube">YouTube</option>
+                              <option value="video">Video</option>
+                              <option value="image">Image</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-zinc-700">Source URL</label>
+                            <input
+                              type="url"
+                              value={item.src}
+                              onChange={(e) => updateReviewMediaItem(item.id, { src: e.target.value })}
+                              placeholder={
+                                item.kind === "youtube"
+                                  ? "https://www.youtube.com/watch?v=..."
+                                  : "https://example.com/media-file"
+                              }
+                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-zinc-700">Caption</label>
+                            <input
+                              type="text"
+                              value={item.caption}
+                              onChange={(e) => updateReviewMediaItem(item.id, { caption: e.target.value })}
+                              placeholder="Optional caption"
+                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-zinc-700">Poster URL</label>
+                            <input
+                              type="url"
+                              value={item.poster}
+                              onChange={(e) => updateReviewMediaItem(item.id, { poster: e.target.value })}
+                              placeholder="Optional poster / thumbnail URL"
+                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-xl border-dashed border-zinc-300 py-5 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900"
+                      onClick={addReviewMediaItem}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Review Media
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className="flex items-center justify-between">
@@ -1378,7 +1832,7 @@ export default function AdminCourseNewPage() {
                     className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
                   >
                     <Check className="h-4 w-4" />
-                    Create course
+                    {editId ? "Save changes" : "Create course"}
                   </Button>
                 </div>
               </div>
@@ -1433,6 +1887,18 @@ export default function AdminCourseNewPage() {
                 </div>
 
                 {coverError ? <p className="text-sm text-destructive">{coverError}</p> : null}
+
+                <FormField name="imageUrl" label="Course Cover URL">
+                  {({ id, error, ...rest }) => (
+                    <FormInput
+                      id={id}
+                      error={error}
+                      placeholder="https://example.com/course-cover.jpg"
+                      className="rounded-xl border-zinc-200"
+                      {...rest}
+                    />
+                  )}
+                </FormField>
 
                 <FormField name="videoPreviewUrl" label="Course Video Preview URL">
                   {({ id, error, ...rest }) => (

@@ -4,7 +4,6 @@ import {
   adminCourseNullableResponseSchema,
   adminCourseResponseSchema,
   adminDeleteCourseResponseSchema,
-  courseSchema,
   enrollCourseResponseSchema,
   adminEnrollUserResponseSchema,
   publicCourseResponseSchema,
@@ -62,6 +61,13 @@ export async function getPublicCourses(): Promise<Course[]> {
   return res.items as Course[];
 }
 
+export async function getFeaturedCourses(limit = 12): Promise<Course[]> {
+  const res = await apiGet(`/api/courses/featured?limit=${encodeURIComponent(String(limit))}`, {
+    schema: publicCoursesResponseSchema,
+  });
+  return res.items as Course[];
+}
+
 export async function getMyCourses(): Promise<Course[]> {
   const res = await apiGet("/api/me/courses", { schema: publicCoursesResponseSchema });
   return (res.items as Course[]) ?? [];
@@ -73,6 +79,18 @@ export async function getPublicCourse(id: string): Promise<Course | null> {
     return res.course as Course;
   } catch {
     return null;
+  }
+}
+
+export async function getRelatedCourses(courseId: string, limit = 4): Promise<Course[]> {
+  try {
+    const res = await apiGet(
+      `/api/courses/${encodeURIComponent(courseId)}/related?limit=${encodeURIComponent(String(limit))}`,
+      { schema: publicCoursesResponseSchema }
+    );
+    return (res.items as Course[]) ?? [];
+  } catch {
+    return [];
   }
 }
 

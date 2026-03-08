@@ -483,7 +483,7 @@ export function AdminOrdersView() {
 
       <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
         <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-3 sm:grid-cols-[1fr_180px_180px_180px_auto] sm:items-end">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto] sm:items-end">
             <div className="space-y-1">
               <div className="text-xs font-semibold text-zinc-600">Search</div>
               <div className="relative">
@@ -542,11 +542,11 @@ export function AdminOrdersView() {
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 rounded-xl border-zinc-200"
+                className="h-10 w-full rounded-xl border-zinc-200 sm:w-auto"
                 onClick={() => {
                   const rows = filtered.map((o) => ({
                     id: o.id,
@@ -572,7 +572,7 @@ export function AdminOrdersView() {
               </Button>
               <Button
                 type="button"
-                className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                className="h-10 w-full rounded-xl bg-gold text-gold-foreground hover:bg-gold/90 sm:w-auto"
                 onClick={() => void reload()}
               >
                 <RefreshCcw className="h-4 w-4" />
@@ -611,14 +611,176 @@ export function AdminOrdersView() {
             </div>
           ) : (
             <>
-              <DataTable
-                columns={columns}
-                data={filtered}
-                pageSize={10}
-                enableRowSelection={false}
-                emptyMessage="No orders found."
-                className="[&_.rounded-md.border]:rounded-2xl [&_.rounded-md.border]:border-zinc-200 [&_thead]:bg-zinc-50/70"
-              />
+              <div className="block xl:hidden space-y-3">
+                {filtered.map((o) => {
+                  const net = Math.max(0, o.amount - (o.discountAmount ?? 0));
+                  const tid = o.transactionId?.trim();
+                  const canRefund = o.status === "paid";
+
+                  return (
+                    <Card
+                      key={o.id}
+                      className="rounded-2xl border-zinc-200 bg-white shadow-sm overflow-hidden"
+                    >
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDetailsOrder(o);
+                                  setDetailsOpen(true);
+                                }}
+                                className="truncate text-left font-semibold text-zinc-900 underline-offset-2 hover:underline"
+                              >
+                                #{o.id}
+                              </button>
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize",
+                                    statusBadge(o.status)
+                                  )}
+                                >
+                                  {o.status === "paid" ? (
+                                    <BadgeCheck className="h-4 w-4" />
+                                  ) : o.status === "pending" ? (
+                                    <Clock className="h-4 w-4" />
+                                  ) : o.status === "failed" ? (
+                                    <BadgeX className="h-4 w-4" />
+                                  ) : (
+                                    <RefreshCcw className="h-4 w-4" />
+                                  )}
+                                  {o.status}
+                                </span>
+                                <span className="text-xs text-zinc-500">{formatDate(o.createdAt)}</span>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 shrink-0 rounded-lg border-zinc-200"
+                              onClick={() => void copyText(o.id)}
+                              aria-label="Copy order id"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-zinc-100 to-zinc-200 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200/80">
+                              {getInitials(o.studentName)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-zinc-900">{o.studentName}</div>
+                              <div className="truncate text-sm text-zinc-500">{o.studentEmail}</div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
+                            <div className="text-sm font-medium text-zinc-900">{o.courseTitle}</div>
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-semibold text-zinc-900">
+                                  {formatCurrency(net, o.currency)}
+                                </div>
+                                {(o.discountAmount ?? 0) > 0 ? (
+                                  <div className="text-xs text-zinc-500">
+                                    Discount {formatCurrency(o.discountAmount ?? 0, o.currency)}
+                                    {o.promoCode ? ` · ${o.promoCode}` : ""}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="text-right text-sm text-zinc-600">
+                                <div className="font-medium text-zinc-800">{o.provider}</div>
+                                <div className="text-xs text-zinc-500">{o.paymentMethod ?? "—"}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
+                            <span className="font-medium text-zinc-800">Transaction:</span>
+                            <span className="truncate max-w-[180px]">{tid || "—"}</span>
+                            {tid ? (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-6 w-6 rounded border-zinc-200"
+                                onClick={() => void copyText(tid)}
+                                aria-label="Copy transaction ID"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap justify-end gap-2 pt-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg border-zinc-200"
+                              onClick={() => {
+                                setDetailsOrder(o);
+                                setDetailsOpen(true);
+                              }}
+                              aria-label="View order details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={!canRefund}
+                              className={cn(
+                                "h-8 rounded-lg border-zinc-200",
+                                canRefund ? "text-amber-700 hover:text-amber-800 hover:border-amber-200" : "opacity-50"
+                              )}
+                              onClick={() => {
+                                setRefundOrder(o);
+                                setRefundOpen(true);
+                              }}
+                              aria-label="Refund order"
+                            >
+                              <RefreshCcw className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg border-zinc-200 text-red-600 hover:text-red-700"
+                              onClick={() => {
+                                setDeleteOrder(o);
+                                setDeleteOpen(true);
+                              }}
+                              aria-label="Delete order"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <div className="hidden xl:block overflow-x-auto -mx-4 sm:mx-0">
+                <div className="min-w-[980px] px-4 sm:px-0">
+                  <DataTable
+                    columns={columns}
+                    data={filtered}
+                    pageSize={10}
+                    enableRowSelection={false}
+                    emptyMessage="No orders found."
+                    className="[&_.rounded-md.border]:rounded-2xl [&_.rounded-md.border]:border-zinc-200 [&_thead]:bg-zinc-50/70"
+                  />
+                </div>
+              </div>
             </>
           )}
         </CardContent>

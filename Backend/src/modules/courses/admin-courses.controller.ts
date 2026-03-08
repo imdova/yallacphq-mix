@@ -21,6 +21,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import type { RequestUser } from '../../common/auth/current-user.decorator';
 import { Role as AppRole } from '../../common/auth/role';
 import { Roles } from '../../common/auth/roles.decorator';
 import { RolesGuard } from '../../common/auth/roles.guard';
@@ -75,7 +77,6 @@ export class AdminCoursesController {
   @Version('1')
   @Roles(AppRole.admin)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @UsePipes(new ZodValidationPipe(createCourseBodySchema))
   @ResponseSchema(adminCourseResponseSchema)
   @ApiOperation({
     summary: 'Admin: create course',
@@ -121,8 +122,15 @@ export class AdminCoursesController {
     },
   })
   @ApiCreatedResponse({ type: CourseResponseDto, description: 'Created course with id, timestamps, and defaults' })
-  async create(@Body() body: CreateCourseBody) {
-    const created = await this.courses.create(body);
+  async create(
+    @Body(new ZodValidationPipe(createCourseBodySchema))
+    body: CreateCourseBody,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const created = await this.courses.create({
+      ...body,
+      createdByUserId: user.sub,
+    });
     return { course: toApiCourse(created) };
   }
 

@@ -29,6 +29,7 @@ export function CourseCard({ course }: { course: Course }) {
   const hasSale = course.priceSale != null && course.priceSale > 0 && (course.priceRegular ?? 0) > (course.priceSale ?? 0);
   const displayPrice = hasSale ? course.priceSale! : (course.priceRegular ?? 0);
   const isFree = displayPrice === 0;
+  const enrollmentOpen = course.enableEnrollment !== false;
   const lessonsCount = course.lessons ?? Math.max(1, Math.round(course.durationHours * 4));
   const [enrolling, setEnrolling] = React.useState(false);
   const [enrollError, setEnrollError] = React.useState<string | null>(null);
@@ -156,7 +157,17 @@ export function CourseCard({ course }: { course: Course }) {
           >
             <Link href={detailsHref}>View Details</Link>
           </Button>
-          {isFree ? (
+          {!enrollmentOpen ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="shrink-0 rounded-xl border-zinc-200 text-zinc-500"
+              disabled
+            >
+              Enrollment closed
+            </Button>
+          ) : isFree ? (
             status === "authenticated" ? (
               <Button
                 type="button"

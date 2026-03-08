@@ -106,4 +106,22 @@ export class OrdersService {
       )
       .exec();
   }
+
+  async failPendingOlderThan(hours: number) {
+    const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+    const cutoff = new Date(Date.now() - safeHours * 60 * 60 * 1000);
+    return this.orderModel
+      .updateMany(
+        {
+          status: 'pending',
+          createdAt: { $lte: cutoff },
+        },
+        {
+          $set: {
+            status: 'failed',
+          },
+        },
+      )
+      .exec();
+  }
 }

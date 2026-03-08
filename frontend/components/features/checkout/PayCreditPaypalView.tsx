@@ -19,6 +19,26 @@ const FALLBACK_ORDER_NAME = "CPHQ Mastery Bundle";
 
 const PAYPAL_SCRIPT_ID = "paypal-sdk-script";
 
+declare global {
+  interface Window {
+    initPayPalButton?: () => void;
+    paypal?: {
+      Buttons: (config: {
+        style?: { shape?: string; color?: string; layout?: string; label?: string };
+        createOrder?: (
+          data: unknown,
+          actions: { order: { create: (opts: unknown) => Promise<{ id: string }> } }
+        ) => Promise<string>;
+        onApprove?: (
+          data: unknown,
+          actions: { order: { capture: () => Promise<unknown> } }
+        ) => Promise<void>;
+        onError?: (err: unknown) => void;
+      }) => { render: (selector: string) => Promise<void> };
+    };
+  }
+}
+
 export function PayCreditPaypalView() {
   const searchParams = useSearchParams();
   const router = useRouter();

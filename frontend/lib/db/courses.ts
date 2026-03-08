@@ -253,6 +253,52 @@ export async function getCourseById(id: string): Promise<Course | null> {
   return course ? clone(course) : null;
 }
 
+export async function getFeaturedCourses(limit = 12): Promise<Course[]> {
+  await delay(150);
+  const published = store.filter((c) => (c.status ?? "published") === "published");
+  const featured = published
+    .filter((c) => c.featured)
+    .sort((a, b) => (a.featuredOrder ?? Number.MAX_SAFE_INTEGER) - (b.featuredOrder ?? Number.MAX_SAFE_INTEGER));
+  const items = (featured.length ? featured : published).slice(0, limit);
+  return clone(items);
+}
+
+export async function getRelatedCourses(id: string, limit = 4): Promise<Course[]> {
+  await delay(120);
+  const course = store.find((c) => c.id === id && (c.status ?? "published") === "published");
+  if (!course) return [];
+
+  const seen = new Set<string>([id]);
+  const related: Course[] = [];
+
+  for (const relatedId of course.relatedCourseIds ?? []) {
+    const match = store.find((c) => c.id === relatedId && (c.status ?? "published") === "published");
+    if (!match || seen.has(match.id)) continue;
+    seen.add(match.id);
+    related.push(match);
+    if (related.length >= limit) return clone(related.slice(0, limit));
+  }
+
+  for (const match of store) {
+    if (related.length >= limit) break;
+    if (match.id === id || seen.has(match.id)) continue;
+    if ((match.status ?? "published") !== "published") continue;
+    if (match.tag !== course.tag) continue;
+    seen.add(match.id);
+    related.push(match);
+  }
+
+  for (const match of store) {
+    if (related.length >= limit) break;
+    if (match.id === id || seen.has(match.id)) continue;
+    if ((match.status ?? "published") !== "published") continue;
+    seen.add(match.id);
+    related.push(match);
+  }
+
+  return clone(related.slice(0, limit));
+}
+
 function nextId(): string {
   const max = store.reduce((acc, c) => Math.max(acc, Number(c.id) || 0), 0);
   return String(max + 1);
@@ -264,8 +310,8 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
     id: nextId(),
     title: data.title,
     tag: data.tag,
-    rating: 4.8,
-    reviewCount: 0,
+    rating: data.rating ?? 4.8,
+    reviewCount: data.reviewCount ?? 0,
     description: data.description,
     whoCanAttend: data.whoCanAttend,
     whyYalla: data.whyYalla,
@@ -294,6 +340,12 @@ export async function createCourse(data: CreateCourseInput): Promise<Course> {
     seoTitle: data.seoTitle,
     seoDescription: data.seoDescription,
     seoKeywords: data.seoKeywords,
+    learningOutcomes: data.learningOutcomes,
+    curriculumSections: data.curriculumSections,
+    reviewMedia: data.reviewMedia,
+    featured: data.featured ?? false,
+    featuredOrder: data.featuredOrder,
+    relatedCourseIds: data.relatedCourseIds,
   };
   store = [...store, course];
   return clone(course);
@@ -322,6 +374,12 @@ export async function updateCourse(id: string, data: UpdateCourseInput): Promise
     enableEnrollment: data.enableEnrollment ?? prev.enableEnrollment,
     requireApproval: data.requireApproval ?? prev.requireApproval,
     socialSharing: data.socialSharing ?? prev.socialSharing,
+    learningOutcomes: data.learningOutcomes ?? prev.learningOutcomes,
+    curriculumSections: data.curriculumSections ?? prev.curriculumSections,
+    reviewMedia: data.reviewMedia ?? prev.reviewMedia,
+    featured: data.featured ?? prev.featured,
+    featuredOrder: data.featuredOrder ?? prev.featuredOrder,
+    relatedCourseIds: data.relatedCourseIds ?? prev.relatedCourseIds,
   };
   store = store.map((c) => (c.id === id ? updated : c));
   return clone(updated);

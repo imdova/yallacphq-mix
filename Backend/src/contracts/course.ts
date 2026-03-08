@@ -2,6 +2,50 @@ import { z } from 'zod';
 import { apiOkSchema } from './common';
 import { userSchema } from './user';
 
+export const courseReviewMediaKindSchema = z.enum(['image', 'video', 'youtube']);
+export type CourseReviewMediaKind = z.infer<typeof courseReviewMediaKindSchema>;
+
+export const courseReviewMediaItemSchema = z.object({
+  id: z.string().min(1),
+  kind: courseReviewMediaKindSchema,
+  src: z.string().min(1),
+  caption: z.string().optional(),
+  poster: z.string().optional(),
+});
+export type CourseReviewMediaItem = z.infer<typeof courseReviewMediaItemSchema>;
+
+export const curriculumLectureSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('lecture'),
+  title: z.string().min(1),
+  videoUrl: z.string().optional(),
+  materialUrl: z.string().optional(),
+  materialFileName: z.string().optional(),
+  freeLecture: z.boolean().optional(),
+});
+export type CurriculumLecture = z.infer<typeof curriculumLectureSchema>;
+
+export const curriculumQuizSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('quiz'),
+  title: z.string().min(1),
+});
+export type CurriculumQuiz = z.infer<typeof curriculumQuizSchema>;
+
+export const curriculumItemSchema = z.discriminatedUnion('type', [
+  curriculumLectureSchema,
+  curriculumQuizSchema,
+]);
+export type CurriculumItem = z.infer<typeof curriculumItemSchema>;
+
+export const curriculumSectionSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  items: z.array(curriculumItemSchema).optional(),
+});
+export type CurriculumSection = z.infer<typeof curriculumSectionSchema>;
+
 export const courseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -49,6 +93,13 @@ export const courseSchema = z.object({
   seoDescription: z.string().optional(),
   seoKeywords: z.string().optional(),
 
+  learningOutcomes: z.array(z.string()).optional(),
+  curriculumSections: z.array(curriculumSectionSchema).optional(),
+  reviewMedia: z.array(courseReviewMediaItemSchema).optional(),
+  featured: z.boolean().optional(),
+  featuredOrder: z.number().int().min(0).optional(),
+  relatedCourseIds: z.array(z.string()).optional(),
+
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -92,6 +143,12 @@ export const createCourseBodySchema = z.object({
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
   seoKeywords: z.string().optional(),
+  learningOutcomes: z.array(z.string().min(1)).optional(),
+  curriculumSections: z.array(curriculumSectionSchema).optional(),
+  reviewMedia: z.array(courseReviewMediaItemSchema).optional(),
+  featured: z.boolean().optional(),
+  featuredOrder: z.number().int().min(0).optional(),
+  relatedCourseIds: z.array(z.string().min(1)).optional(),
 });
 
 export type CreateCourseBody = z.infer<typeof createCourseBodySchema>;

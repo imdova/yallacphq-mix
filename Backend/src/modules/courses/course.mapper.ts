@@ -36,6 +36,12 @@ export function toApiCourse(course: CourseDocument): ApiCourse {
     seoTitle: course.seoTitle,
     seoDescription: course.seoDescription,
     seoKeywords: course.seoKeywords,
+    learningOutcomes: course.learningOutcomes,
+    curriculumSections: course.curriculumSections,
+    reviewMedia: course.reviewMedia,
+    featured: course.featured,
+    featuredOrder: course.featuredOrder,
+    relatedCourseIds: course.relatedCourseIds,
     createdAt: (course as unknown as { createdAt?: Date }).createdAt?.toISOString?.(),
     updatedAt: (course as unknown as { updatedAt?: Date }).updatedAt?.toISOString?.(),
   };

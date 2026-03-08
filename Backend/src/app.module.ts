@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env.schema';
 import { AppController } from './app.controller';
@@ -51,6 +52,7 @@ function getReqBasics(req: unknown): { method?: string; url?: string } {
       envFilePath: ['.env', '.env.local'],
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

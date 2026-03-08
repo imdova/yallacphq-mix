@@ -35,7 +35,7 @@ export async function getPublicStudentFieldOptions(): Promise<StudentFieldOption
 }
 
 export async function updateStudentFieldOptions(
-  data: { countries?: string[]; specialities?: string[] }
+  data: { countries?: string[]; specialities?: string[]; categories?: string[] }
 ): Promise<StudentFieldOptions> {
   const body = updateStudentFieldOptionsBodySchema.parse(data);
   const res = await apiPatch("/api/admin/settings/student-fields", body, {

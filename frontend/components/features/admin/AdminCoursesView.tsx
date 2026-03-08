@@ -17,7 +17,7 @@ import {
 import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/features/admin/ConfirmDialog";
 import { createCourse, deleteCourse, getCourses } from "@/lib/dal/courses";
-import type { Course } from "@/types/course";
+import type { Course, CreateCourseInput } from "@/types/course";
 import { Copy, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getErrorMessage } from "@/lib/api/error";
 
@@ -38,6 +38,40 @@ function formatPrice(c: Course) {
   const label = formatCurrency(display, c.currency);
   const strike = hasSale ? formatCurrency(c.priceRegular ?? 0, c.currency) : null;
   return { label, strike };
+}
+
+function buildDuplicateCourseInput(course: Course): CreateCourseInput {
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    title,
+    curriculumSections,
+    reviewMedia,
+    learningOutcomes,
+    relatedCourseIds,
+    ...rest
+  } = course;
+
+  return {
+    ...rest,
+    title: `${title} (Copy)`,
+    learningOutcomes: learningOutcomes ? [...learningOutcomes] : undefined,
+    relatedCourseIds: relatedCourseIds ? [...relatedCourseIds] : undefined,
+    reviewMedia: reviewMedia
+      ? reviewMedia.map((item) => ({
+          ...item,
+        }))
+      : undefined,
+    curriculumSections: curriculumSections
+      ? curriculumSections.map((section) => ({
+          ...section,
+          items: section.items?.map((item) => ({
+            ...item,
+          })),
+        }))
+      : undefined,
+  };
 }
 
 export function AdminCoursesView() {
@@ -116,16 +150,12 @@ export function AdminCoursesView() {
   };
 
   const duplicateCourse = React.useCallback(async (course: Course) => {
-    const created = await createCourse({
-      title: `${course.title} (Copy)`,
-      tag: course.tag,
-      instructorName: course.instructorName,
-      instructorTitle: course.instructorTitle,
-      durationHours: course.durationHours,
-      priceRegular: course.priceRegular ?? 0,
-      priceSale: course.priceSale,
-    });
-    setCourses((prev) => [...prev, created]);
+    try {
+      const created = await createCourse(buildDuplicateCourseInput(course));
+      setCourses((prev) => [...prev, created]);
+    } catch (e) {
+      setError(getErrorMessage(e, "Failed to duplicate course"));
+    }
   }, []);
 
   const columns: ColumnDef<Course>[] = React.useMemo(

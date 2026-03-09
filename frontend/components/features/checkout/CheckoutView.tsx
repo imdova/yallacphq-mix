@@ -15,17 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  CreditCard,
   Building2,
   Lock,
-  Check,
   Shield,
   Mail,
   Instagram,
   Building,
   BadgeCheck,
 } from "lucide-react";
-import { ROUTES } from "@/constants";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api/error";
 import { useAuth } from "@/contexts/auth-context";
@@ -53,22 +50,35 @@ const COUNTRY_CODES = [
   { value: "+44", label: "+44", name: "Britain", cc: "gb" },
 ];
 
-type PaymentMethod = "paypal_card" | "bank";
+type PaymentMethod = "card" | "paypal_card" | "bank";
 
 export function CheckoutView() {
   const router = useRouter();
-  const { status } = useAuth();
+  useAuth(); // ensure auth context is available
   const { courseIds } = useCart();
   const [cartCourses, setCartCourses] = React.useState<Course[]>([]);
   const [cartLoading, setCartLoading] = React.useState(true);
-  const [payment, setPayment] = React.useState<PaymentMethod>("bank");
+  const [payment, setPayment] = React.useState<PaymentMethod>("card");
   const [discountCode, setDiscountCode] = React.useState("");
   const [promoStatus, setPromoStatus] = React.useState<"idle" | "valid" | "invalid" | "loading">("idle");
   const [promoMessage, setPromoMessage] = React.useState<string | null>(null);
   const [discountAmount, setDiscountAmount] = React.useState(0);
+  const [fullName, setFullName] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [countryCode, setCountryCode] = React.useState("+20");
   const [phone, setPhone] = React.useState("");
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
+
+  const isEmailValid = React.useMemo(() => {
+    const v = email.trim();
+    if (!v) return false;
+    // intentionally simple: enough to catch missing/obvious invalid emails without being overly strict
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  }, [email]);
+
+  const isAccountDetailsValid = React.useMemo(() => {
+    return fullName.trim().length > 0 && isEmailValid && phone.trim().length > 0 && countryCode.trim().length > 0;
+  }, [fullName, isEmailValid, phone, countryCode]);
 
   React.useEffect(() => {
     if (courseIds.length === 0) {
@@ -173,39 +183,44 @@ export function CheckoutView() {
       <main className="flex-1 w-full min-w-0 px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-10">
         <div className="container mx-auto w-full grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,320px)] md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:gap-12 xl:max-w-[90rem] 2xl:max-w-[100rem]">
           {/* Left: Checkout form - on small screens below form; on md+ first column */}
-          <div className="min-w-0 space-y-6 order-2 md:order-1 sm:space-y-8">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl md:text-3xl">
-                Secure Checkout
-              </h1>
-            </div>
-
+          <div className="min-w-0 space-y-6 order-1 md:order-1 sm:space-y-8">
             <form className="space-y-6 sm:space-y-8" onSubmit={(e) => e.preventDefault()}>
               <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
                 {/* 1. Account Details */}
-                <div className="p-4 sm:p-6">
+                <div className="p-3 sm:p-4">
                   <div className="flex items-center gap-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-bold text-gold-foreground">
                       1
                     </span>
                     <h2 className="text-base font-semibold text-zinc-900 sm:text-lg">Account Details</h2>
                   </div>
-                  <div className="mt-4 space-y-4 sm:mt-5">
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  <div className="mt-3 space-y-3 sm:mt-4">
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-zinc-700">Full Name</Label>
                         <Input
                           type="text"
-                          defaultValue="John Doe"
-                          className="h-10 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white sm:h-11"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                          placeholder="John Doe"
+                          aria-invalid={fullName.trim().length === 0}
+                          className={cn(
+                            "h-10 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white",
+                            fullName.trim().length === 0 ? "ring-1 ring-transparent" : ""
+                          )}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-zinc-700">Email Address</Label>
                         <Input
                           type="email"
-                          defaultValue="john@example.com"
-                          className="h-10 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white sm:h-11"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          placeholder="john@example.com"
+                          aria-invalid={email.trim().length > 0 && !isEmailValid}
+                          className="h-10 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white"
                         />
                       </div>
                     </div>
@@ -213,7 +228,7 @@ export function CheckoutView() {
                       <Label className="text-sm font-medium text-zinc-700">Phone Number</Label>
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
                         <Select value={countryCode} onValueChange={setCountryCode}>
-                          <SelectTrigger className="h-10 w-full rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white sm:h-11 sm:w-[130px] sm:shrink-0 md:w-[140px]">
+                          <SelectTrigger className="h-10 w-full rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white sm:w-[130px] sm:shrink-0 md:w-[140px]">
                             <SelectValue>
                               {(() => {
                                 const cur = COUNTRY_CODES.find((c) => c.value === countryCode);
@@ -258,9 +273,14 @@ export function CheckoutView() {
                           placeholder="555 123 4567"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="h-10 min-w-0 flex-1 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white sm:h-11"
+                          required
+                          aria-invalid={phone.trim().length === 0}
+                          className="h-10 min-w-0 flex-1 rounded-xl border-zinc-200 bg-zinc-50/50 focus:bg-white"
                         />
                       </div>
+                      {email.trim().length > 0 && !isEmailValid ? (
+                        <p className="text-xs text-rose-600">Please enter a valid email address.</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -268,7 +288,7 @@ export function CheckoutView() {
                 <div className="border-t border-zinc-200" />
 
                 {/* 2. Select Payment Method */}
-                <div className="p-4 sm:p-6">
+                <div className="p-3 sm:p-4">
                   <div className="flex items-center gap-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-bold text-gold-foreground">
                       2
@@ -276,79 +296,107 @@ export function CheckoutView() {
                     <h2 className="text-base font-semibold text-zinc-900 sm:text-lg">Select Payment Method</h2>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 sm:mt-4">
                     <button
                       type="button"
-                      onClick={() => setPayment("paypal_card")}
+                      onClick={() => setPayment("card")}
                       className={cn(
-                        "group relative flex w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3 text-left shadow-sm transition",
-                        payment === "paypal_card"
-                          ? "border-gold ring-2 ring-gold/20"
-                          : "border-zinc-200 hover:border-zinc-300"
+                        "group relative flex w-full items-center justify-between gap-6 rounded-[28px] border-2 bg-white px-6 py-4 text-left transition sm:px-7",
+                        payment === "card" ? "border-gold" : "border-zinc-200 hover:border-zinc-300"
                       )}
-                      aria-pressed={payment === "paypal_card"}
+                      aria-pressed={payment === "card"}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
-                          <CreditCard className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-zinc-900">Credit Card</p>
-                          <p className="text-xs text-zinc-500">All major cards supported</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="hidden items-center gap-1.5 sm:flex" aria-hidden>
-                          <span className="h-5 w-8 rounded bg-[#1a1f71]" />
-                          <span className="h-5 w-8 rounded bg-[#eb001b]" />
-                          <span className="h-5 w-8 rounded bg-[#ff5f00]" />
-                        </div>
-                        <span
-                          className={cn(
-                            "flex h-5 w-5 items-center justify-center rounded-full border",
-                            payment === "paypal_card" ? "border-gold bg-gold text-gold-foreground" : "border-zinc-300"
-                          )}
-                          aria-hidden
-                        >
-                          {payment === "paypal_card" ? <Check className="h-3.5 w-3.5" /> : null}
-                        </span>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPayment("bank");
-                        try {
-                          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(checkoutPayloadRef.current));
-                        } catch {
-                          // ignore
-                        }
-                        router.push("/checkout/bank-transfer");
-                      }}
-                      className={cn(
-                        "group relative flex w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3 text-left shadow-sm transition",
-                        payment === "bank" ? "border-gold ring-2 ring-gold/20" : "border-zinc-200 hover:border-zinc-300"
-                      )}
-                      aria-pressed={payment === "bank"}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
-                          <Building2 className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-zinc-900">Bank Transfer</p>
-                          <p className="text-xs text-zinc-500">Upload receipt after transfer</p>
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2 sm:flex-nowrap">
+                        <p className="min-w-0 text-base font-semibold text-zinc-900 sm:text-lg">Paymob</p>
+                        <div className="flex items-center gap-2 sm:ml-2" aria-hidden>
+                          <span className="inline-flex h-7 w-12 items-center justify-center rounded-md bg-[#1a1f71] text-[12px] font-bold tracking-wide text-white">
+                            VISA
+                          </span>
+                          <span className="relative inline-flex h-7 w-12 items-center justify-center rounded-md bg-white ring-1 ring-zinc-200">
+                            <span className="absolute left-[14px] h-4 w-4 rounded-full bg-[#eb001b]" />
+                            <span className="absolute left-[20px] h-4 w-4 rounded-full bg-[#f79e1b]" />
+                          </span>
                         </div>
                       </div>
                       <span
                         className={cn(
-                          "flex h-5 w-5 items-center justify-center rounded-full border",
-                          payment === "bank" ? "border-gold bg-gold text-gold-foreground" : "border-zinc-300"
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition",
+                          payment === "card" ? "border-gold" : "border-zinc-200"
                         )}
                         aria-hidden
                       >
-                        {payment === "bank" ? <Check className="h-3.5 w-3.5" /> : null}
+                        <span
+                          className={cn(
+                            "h-3 w-3 rounded-full transition",
+                            payment === "card" ? "bg-gold" : "bg-transparent"
+                          )}
+                        />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPayment("paypal_card")}
+                      className={cn(
+                        "group relative flex w-full items-center justify-between gap-6 rounded-[28px] border-2 bg-white px-6 py-4 text-left transition sm:px-7",
+                        payment === "paypal_card" ? "border-gold" : "border-zinc-200 hover:border-zinc-300"
+                      )}
+                      aria-pressed={payment === "paypal_card"}
+                    >
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2 sm:flex-nowrap">
+                        <p className="min-w-0 text-base font-semibold text-zinc-900 sm:text-lg">Card / PayPal</p>
+                        <div className="flex items-center gap-2 sm:ml-2" aria-hidden>
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white ring-1 ring-zinc-200">
+                            <span className="relative block h-4 w-5 rounded-[3px] border-2 border-[#0b3d91]">
+                              <span className="absolute left-0 top-[3px] h-[2px] w-full bg-[#0b3d91]" />
+                            </span>
+                          </span>
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white ring-1 ring-zinc-200">
+                            <span className="text-[14px] font-extrabold leading-none text-[#003087]">P</span>
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition",
+                          payment === "paypal_card" ? "border-gold" : "border-zinc-200"
+                        )}
+                        aria-hidden
+                      >
+                        <span
+                          className={cn(
+                            "h-3 w-3 rounded-full transition",
+                            payment === "paypal_card" ? "bg-gold" : "bg-transparent"
+                          )}
+                        />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPayment("bank")}
+                      className={cn(
+                        "group relative flex w-full items-center justify-between gap-6 rounded-[28px] border-2 bg-white px-6 py-4 text-left transition sm:px-7",
+                        payment === "bank" ? "border-gold" : "border-zinc-200 hover:border-zinc-300"
+                      )}
+                      aria-pressed={payment === "bank"}
+                    >
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2 sm:flex-nowrap">
+                        <p className="min-w-0 text-base font-semibold text-zinc-900 sm:text-lg">Bank Transfer</p>
+                        <div className="flex items-center gap-2 sm:ml-2" aria-hidden>
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white ring-1 ring-zinc-200">
+                            <Building2 className="h-4 w-4 text-[#0b3d91]" />
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition",
+                          payment === "bank" ? "border-gold" : "border-zinc-200"
+                        )}
+                        aria-hidden
+                      >
+                        <span className={cn("h-3 w-3 rounded-full transition", payment === "bank" ? "bg-gold" : "bg-transparent")} />
                       </span>
                     </button>
                   </div>
@@ -358,7 +406,7 @@ export function CheckoutView() {
           </div>
 
           {/* Right: Order summary - on small screens show first; on md+ second column, sticky */}
-          <div className="order-1 min-w-0 md:order-2 md:sticky md:top-24 md:self-start">
+          <div className="order-2 min-w-0 md:order-2 md:sticky md:top-24 md:self-start">
             <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-lg sm:rounded-2xl sm:p-6">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold text-gold-foreground font-bold text-sm">
@@ -413,8 +461,8 @@ export function CheckoutView() {
                 />
                 <Button
                   type="button"
-                  variant="outline"
-                  className="h-10 w-full shrink-0 rounded-xl border-zinc-200 sm:w-auto"
+                  variant="default"
+                  className="h-10 w-full shrink-0 rounded-xl bg-black text-white hover:bg-black/90 disabled:opacity-60 sm:w-auto"
                   disabled={promoStatus === "loading"}
                   onClick={() => void applyPromo()}
                 >
@@ -449,19 +497,21 @@ export function CheckoutView() {
               <Button
                 className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-semibold text-gold-foreground shadow-md hover:bg-gold/90 sm:mt-6 sm:h-12 sm:text-base"
                 onClick={() => {
+                  if (!isAccountDetailsValid) {
+                    setCheckoutError("Please fill in Full Name, Email Address, and Phone Number to continue.");
+                    return;
+                  }
+                  setCheckoutError(null);
                   try {
                     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(checkoutPayloadRef.current));
                   } catch {
                     // ignore
                   }
-                  if (payment === "paypal_card") {
-                    router.push("/checkout/card");
-                    return;
-                  }
-                  router.push("/checkout/bank-transfer");
+                  if (payment === "bank") router.push("/checkout/bank-transfer");
+                  else router.push("/checkout/card");
                 }}
               >
-                {payment === "paypal_card" ? "Continue to card payment" : "Continue to bank transfer"}
+                {payment === "bank" ? "Continue to bank transfer" : "Continue to card payment"}
                 <Lock className="ml-1.5 h-4 w-4 shrink-0" />
               </Button>
               <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-zinc-500 sm:mt-4 sm:text-xs">

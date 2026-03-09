@@ -85,6 +85,8 @@ export interface Course {
 export interface CreateCourseInput {
   title: string;
   tag: string;
+  rating?: number;
+  reviewCount?: number;
   description?: string;
   whoCanAttend?: string;
   whyYalla?: string;

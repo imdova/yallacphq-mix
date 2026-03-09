@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Check, Copy, Info, Lock, Upload, X, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BANK, PRODUCT, STORAGE_KEY, type StoredCheckoutPayload } from "@/components/features/checkout/checkoutData";

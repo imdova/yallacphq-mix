@@ -6,7 +6,7 @@ import Link from "next/link";
 import { confirmPayment } from "@/lib/dal/orders";
 import { getErrorMessage } from "@/lib/api/error";
 
-export default function PayPalReturnPage() {
+function PayPalReturnContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = React.useState<"loading" | "success" | "error">("loading");
@@ -73,5 +73,20 @@ export default function PayPalReturnPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PayPalReturnPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-100 px-4">
+        <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+          <p className="mt-4 text-zinc-600">Loading…</p>
+        </div>
+      </div>
+    }>
+      <PayPalReturnContent />
+    </React.Suspense>
   );
 }

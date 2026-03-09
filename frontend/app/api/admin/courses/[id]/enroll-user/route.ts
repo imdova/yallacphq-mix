@@ -1,4 +1,3 @@
-import { ZodError } from "zod";
 import { jsonError, jsonOk, zodIssues } from "@/lib/api/route-helpers";
 import { adminEnrollUserBodySchema, adminEnrollUserResponseSchema } from "@/lib/api/contracts/course";
 import { getBackendUrl, isBackendConfigured, BACKEND_API_PREFIX } from "@/lib/api/backend-url";
@@ -45,7 +44,7 @@ export async function POST(
         return jsonError(res.status, msg, { requestId });
       }
       return jsonOk(adminEnrollUserResponseSchema.parse(data), { requestId });
-    } catch (err) {
+    } catch {
       return jsonError(500, "Unexpected error", { requestId });
     }
   }

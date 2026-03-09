@@ -37,7 +37,7 @@ export async function DELETE(
       out.success ? out.data : { courseIds: [] },
       { headers: { "x-request-id": requestId } }
     );
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { courseIds: [] },
       { status: 200, headers: { "x-request-id": requestId } }

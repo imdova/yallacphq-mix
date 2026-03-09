@@ -16,8 +16,7 @@ import type { CreateUserInput } from "@/types/user";
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
-  { value: "member", label: "Member" },
-  { value: "viewer", label: "Viewer" },
+  { value: "student", label: "Student" },
 ];
 
 export function UserFormModal({
@@ -43,7 +42,7 @@ export function UserFormModal({
         </DialogHeader>
         <Form<CreateUserSchema>
           schema={createUserSchema}
-          defaultValues={{ name: "", email: "", role: "member" }}
+          defaultValues={{ name: "", email: "", role: "student" }}
           onSubmit={handleSubmit}
         >
           {(methods) => (

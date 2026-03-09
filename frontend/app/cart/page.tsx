@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { CoursesHeader } from "@/components/features/courses/CoursesHeader";
 import { CoursesFooter } from "@/components/features/courses/CoursesFooter";
 import { useCart } from "@/contexts/cart-context";

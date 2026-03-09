@@ -39,6 +39,8 @@ export const OFFERS_DROPDOWN_ITEMS = [
   { href: "/offers/cphq-register-1", label: "Start your journey today" },
   { href: "/offers/cphq-free-lecture", label: "CPHQ Free Lecture" },
   { href: "/offers/cphq-offer", label: "CPHQ Offer" },
+  { href: "/cphq-form-1", label: "CPHQ Form 1" },
+  { href: "/cphq-form-2", label: "CPHQ Form 2" },
 ] as const;
 
 export const WEBINARS_DROPDOWN_ITEMS = [

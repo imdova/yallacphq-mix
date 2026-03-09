@@ -9,7 +9,6 @@ import {
 } from "@/lib/api/contracts/order";
 import {
   confirmPaymentResponseSchema,
-  createPaymentSessionBodySchema,
   createPaymentSessionResponseSchema,
 } from "@/lib/api/contracts/checkout";
 

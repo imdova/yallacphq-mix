@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { jsonError, jsonOk } from "@/lib/api/route-helpers";
+import { jsonOk } from "@/lib/api/route-helpers";
 import { studentFieldOptionsResponseSchema } from "@/lib/api/contracts/settings";
 import { getBackendUrl, isBackendConfigured, BACKEND_API_PREFIX } from "@/lib/api/backend-url";
 import { getRequestIdFromRequest, newRequestId } from "@/lib/api/request-id";

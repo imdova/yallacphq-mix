@@ -41,6 +41,8 @@ function formatPrice(c: Course) {
 }
 
 function buildDuplicateCourseInput(course: Course): CreateCourseInput {
+  // Exclude id, createdAt, updatedAt from duplicate payload
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const {
     id: _id,
     createdAt: _createdAt,
@@ -52,6 +54,7 @@ function buildDuplicateCourseInput(course: Course): CreateCourseInput {
     relatedCourseIds,
     ...rest
   } = course;
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   return {
     ...rest,

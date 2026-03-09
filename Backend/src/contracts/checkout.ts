@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { orderSchema, orderStatusSchema, paymentProviderSchema } from './order';
 
-export const checkoutPaymentMethodSchema = z.enum(['paypal', 'card', 'bank']);
+export const checkoutPaymentMethodSchema = z.enum(['paypal', 'card', 'bank', 'paymob']);
+
+const billingDataSchema = z.object({
+  first_name: z.string().min(1),
+  last_name: z.string().min(1),
+  email: z.string().email(),
+  phone_number: z.string().min(1),
+  city: z.string().optional(),
+  country: z.string().optional(),
+});
 
 export const createPaymentSessionBodySchema = z.object({
   method: checkoutPaymentMethodSchema,
@@ -11,10 +20,12 @@ export const createPaymentSessionBodySchema = z.object({
   discountAmount: z.coerce.number().min(0).optional(),
   promoCode: z.string().optional(),
   idempotencyKey: z.string().min(8).optional(),
-  /** Course IDs to enroll the user in after payment (cart checkout). */
   courseIds: z.array(z.string().min(1)).optional(),
-  /** URL of uploaded bank transfer receipt (when method is bank). */
   bankTransferProofUrl: z.string().optional(),
+  /** Required when method is paymob (billing data for Paymob intention). */
+  billingData: billingDataSchema.optional(),
+  /** When method is paymob: which integration to use (card, ewallet, cagg, kiosk). Omit to use all configured. */
+  paymobIntegrationType: z.enum(['card', 'ewallet', 'cagg', 'kiosk']).optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<
@@ -25,6 +36,8 @@ export const createPaymentSessionResponseSchema = z.object({
   sessionId: z.string(),
   provider: paymentProviderSchema,
   order: orderSchema,
+  /** Present when provider is paymob; redirect user to this URL to complete payment. */
+  paymobRedirectUrl: z.string().url().optional(),
 });
 
 export type CreatePaymentSessionResponse = z.infer<

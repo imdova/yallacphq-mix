@@ -33,6 +33,27 @@ export const envSchema = z.object({
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_SECRET: z.string().optional(),
   PAYPAL_API_BASE: z.string().url().optional(),
+
+  // Paymob (optional – required only when using Paymob at checkout)
+  PAYMOB_SECRET_KEY: z.string().optional(),
+  PAYMOB_HMAC_SECRET: z.string().optional(),
+  PAYMOB_PUBLIC_KEY: z.string().optional(),
+  PAYMOB_INTEGRATION_ID: z.coerce.number().int().optional(),
+  /** Optional: ewallet integration (e.g. 5514086). Shown with card on Unified Checkout. */
+  PAYMOB_EWALLET_INTEGRATION_ID: z.coerce.number().int().optional(),
+  /** Optional: CAGG-online integration (e.g. 5514085). */
+  PAYMOB_CAGG_INTEGRATION_ID: z.coerce.number().int().optional(),
+  /** Optional: Accept Kiosk integration ID. */
+  PAYMOB_KIOSK_INTEGRATION_ID: z.coerce.number().int().optional(),
+  PAYMOB_BASE_URL: z.string().url().optional(),
+  PAYMOB_UNIFIED_CHECKOUT_BASE_URL: z.string().url().optional(),
+  PAYMOB_CALLBACK_URL: z.string().url().optional(),
+  PAYMOB_SUCCESS_REDIRECT_URL: z.string().url().optional(),
+  PAYMOB_SKIP_HMAC_VERIFICATION: z.string().optional(),
+  /** Currency required by your Paymob integration (e.g. EGP). Must match Integration ID in Paymob dashboard. */
+  PAYMOB_CURRENCY: z.string().min(1).optional(),
+  /** If true, send amount in main unit (e.g. EGP). If false (default), send in smallest unit (piastres for EGP). Set true if Paymob charges 100x too much. */
+  PAYMOB_AMOUNT_IN_MAIN_UNIT: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

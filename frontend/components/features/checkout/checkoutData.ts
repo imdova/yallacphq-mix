@@ -20,5 +20,14 @@ export type StoredCheckoutPayload = {
   courseIds: string[];
   discountAmount: number;
   promoCode: string;
+  /** For Paymob: billing data sent with createPaymentSession */
+  billingData?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string;
+    city?: string;
+    country?: string;
+  };
 };
 

@@ -37,6 +37,13 @@ export class CreatePaymentSessionBodyDto {
 
   @ApiProperty({ required: false, example: 'https://bucket.s3.region.amazonaws.com/bank-transfers/xxx.pdf' })
   bankTransferProofUrl?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ['card', 'ewallet', 'cagg', 'kiosk'],
+    description: 'When method is paymob: which integration to use. Omit to use all configured.',
+  })
+  paymobIntegrationType?: 'card' | 'ewallet' | 'cagg' | 'kiosk';
 }
 
 export class CreatePaymentSessionResponseDto {

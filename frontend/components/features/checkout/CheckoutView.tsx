@@ -28,11 +28,30 @@ import { getErrorMessage } from "@/lib/api/error";
 import { useAuth } from "@/contexts/auth-context";
 import { useCart } from "@/contexts/cart-context";
 import { validatePromoCode } from "@/lib/dal/promo-codes";
+import { createPaymentSession } from "@/lib/dal/orders";
 import { getPublicCourse } from "@/lib/dal/courses";
 import type { Course } from "@/types/course";
 import { PRODUCT, STORAGE_KEY } from "@/components/features/checkout/checkoutData";
+import { apiGet } from "@/lib/api/client";
 
 const FLAG_CDN = "https://flagcdn.com";
+/** Map phone country code to ISO 3166-1 alpha-3 for Paymob billing_data.country */
+const COUNTRY_CODE_TO_ISO3: Record<string, string> = {
+  "+20": "EGY",
+  "+966": "SAU",
+  "+971": "ARE",
+  "+968": "OMN",
+  "+973": "BHR",
+  "+974": "QAT",
+  "+965": "KWT",
+  "+962": "JOR",
+  "+961": "LBN",
+  "+964": "IRQ",
+  "+1": "USA",
+  "+1-ca": "CAN",
+  "+61": "AUS",
+  "+44": "GBR",
+};
 const COUNTRY_CODES = [
   { value: "+20", label: "+20", name: "Egypt", cc: "eg" },
   { value: "+966", label: "+966", name: "Saudi Arabia", cc: "sa" },
@@ -52,6 +71,8 @@ const COUNTRY_CODES = [
 
 type PaymentMethod = "card" | "paypal_card" | "bank";
 
+type PaymobMethodItem = { type: "card" | "ewallet" | "cagg" | "kiosk"; label: string };
+
 export function CheckoutView() {
   const router = useRouter();
   useAuth(); // ensure auth context is available
@@ -59,6 +80,9 @@ export function CheckoutView() {
   const [cartCourses, setCartCourses] = React.useState<Course[]>([]);
   const [cartLoading, setCartLoading] = React.useState(true);
   const [payment, setPayment] = React.useState<PaymentMethod>("card");
+  const [paymobMethods, setPaymobMethods] = React.useState<PaymobMethodItem[]>([]);
+  const [paymobMethodsLoading, setPaymobMethodsLoading] = React.useState(false);
+  const [paymobIntegrationType, setPaymobIntegrationType] = React.useState<PaymobMethodItem["type"]>("card");
   const [discountCode, setDiscountCode] = React.useState("");
   const [promoStatus, setPromoStatus] = React.useState<"idle" | "valid" | "invalid" | "loading">("idle");
   const [promoMessage, setPromoMessage] = React.useState<string | null>(null);
@@ -79,6 +103,31 @@ export function CheckoutView() {
   const isAccountDetailsValid = React.useMemo(() => {
     return fullName.trim().length > 0 && isEmailValid && phone.trim().length > 0 && countryCode.trim().length > 0;
   }, [fullName, isEmailValid, phone, countryCode]);
+
+  // Fetch available Paymob integration types when user selects Paymob
+  React.useEffect(() => {
+    if (payment !== "card") return;
+    let cancelled = false;
+    setPaymobMethodsLoading(true);
+    apiGet<PaymobMethodItem[]>("/api/checkout/paymob-methods")
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setPaymobMethods(data);
+          if (data.length > 0 && !data.some((m) => m.type === paymobIntegrationType)) {
+            setPaymobIntegrationType(data[0].type);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPaymobMethods([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPaymobMethodsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [payment]);
 
   React.useEffect(() => {
     if (courseIds.length === 0) {
@@ -334,6 +383,41 @@ export function CheckoutView() {
                       </span>
                     </button>
 
+                    {payment === "card" && (
+                      <div className="ml-2 mt-1 flex flex-col gap-2 border-l-2 border-gold/30 pl-4">
+                        {paymobMethodsLoading ? (
+                          <p className="text-sm text-zinc-500">Loading payment options…</p>
+                        ) : paymobMethods.length > 0 ? (
+                          <>
+                            <p className="text-sm font-medium text-zinc-700">Choose payment option</p>
+                            <div className="flex flex-col gap-2">
+                              {paymobMethods.map((m) => (
+                                <label
+                                  key={m.type}
+                                  className={cn(
+                                    "flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition",
+                                    paymobIntegrationType === m.type
+                                      ? "border-gold bg-gold/5"
+                                      : "border-zinc-200 hover:border-zinc-300"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="paymobIntegrationType"
+                                    value={m.type}
+                                    checked={paymobIntegrationType === m.type}
+                                    onChange={() => setPaymobIntegrationType(m.type)}
+                                    className="h-4 w-4 border-zinc-300 text-gold focus:ring-gold"
+                                  />
+                                  <span className="text-sm font-medium text-zinc-900">{m.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => setPayment("paypal_card")}
@@ -489,6 +573,16 @@ export function CheckoutView() {
                   ${total.toFixed(2)}
                 </span>
               </div>
+              {payment === "card" && (() => {
+                const paymobCurrency = (typeof process.env.NEXT_PUBLIC_PAYMOB_CURRENCY === "string" && process.env.NEXT_PUBLIC_PAYMOB_CURRENCY.trim()) || "EGP";
+                const rate = Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 31;
+                const egpAmount = paymobCurrency === "EGP" ? Math.round((total * rate) * 100) / 100 : null;
+                return egpAmount != null ? (
+                  <p className="mt-1 text-right text-sm text-zinc-500">
+                    Paymob will charge: <span className="font-semibold text-zinc-700">{egpAmount.toFixed(2)} EGP</span>
+                  </p>
+                ) : null;
+              })()}
               {checkoutError ? (
                 <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 sm:mt-4 sm:rounded-2xl sm:px-4 sm:py-3">
                   {checkoutError}
@@ -496,7 +590,7 @@ export function CheckoutView() {
               ) : null}
               <Button
                 className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-semibold text-gold-foreground shadow-md hover:bg-gold/90 sm:mt-6 sm:h-12 sm:text-base"
-                onClick={() => {
+                onClick={async () => {
                   if (!isAccountDetailsValid) {
                     setCheckoutError("Please fill in Full Name, Email Address, and Phone Number to continue.");
                     return;
@@ -507,11 +601,62 @@ export function CheckoutView() {
                   } catch {
                     // ignore
                   }
-                  if (payment === "bank") router.push("/checkout/bank-transfer");
-                  else router.push("/checkout/card");
+                  if (payment === "bank") {
+                    router.push("/checkout/bank-transfer");
+                    return;
+                  }
+                  if (payment === "card") {
+                    // Paymob: integration expects EGP (or set NEXT_PUBLIC_PAYMOB_CURRENCY). Send that currency and amount in main unit (e.g. EGP).
+                    const paymobCurrency = (typeof process.env.NEXT_PUBLIC_PAYMOB_CURRENCY === "string" && process.env.NEXT_PUBLIC_PAYMOB_CURRENCY.trim()) || "EGP";
+                    const rate = Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 31;
+                    const amountInPaymobCurrencyRaw = paymobCurrency === "EGP" ? total * rate : total;
+                    // Round to 2 decimals so backend and Paymob charge the exact displayed amount.
+                    const amountInPaymobCurrency = Math.round(amountInPaymobCurrencyRaw * 100) / 100;
+                    const nameParts = fullName.trim().split(/\s+/);
+                    const firstName = nameParts[0] ?? fullName.trim();
+                    const lastName = nameParts.slice(1).join(" ") || firstName;
+                    const countryIso = COUNTRY_CODE_TO_ISO3[countryCode] ?? "EGY";
+                    try {
+                      const res = await createPaymentSession({
+                        method: "paymob",
+                        paymobIntegrationType: paymobMethods.length > 0 ? paymobIntegrationType : undefined,
+                        courseTitle: checkoutPayloadRef.current.courseTitle,
+                        currency: paymobCurrency,
+                        amount: amountInPaymobCurrency,
+                        discountAmount: discountAmount || undefined,
+                        promoCode: discountCode.trim() || undefined,
+                        idempotencyKey: crypto.randomUUID(),
+                        courseIds: checkoutPayloadRef.current.courseIds?.length
+                          ? checkoutPayloadRef.current.courseIds
+                          : undefined,
+                        billingData: {
+                          first_name: firstName,
+                          last_name: lastName,
+                          email: email.trim(),
+                          phone_number: `${countryCode.replace("-", "")}${phone.trim()}`,
+                          city: "Cairo",
+                          country: countryIso,
+                        },
+                      });
+                      if (res.paymobRedirectUrl) {
+                        window.location.href = res.paymobRedirectUrl;
+                        return;
+                      }
+                      setCheckoutError("Paymob is not configured. Please use Card/PayPal or bank transfer.");
+                    } catch (e) {
+                      setCheckoutError(getErrorMessage(e, "Could not start Paymob payment. Try Card/PayPal or bank transfer."));
+                    }
+                    return;
+                  }
+                  // Card / PayPal
+                  router.push("/checkout/card");
                 }}
               >
-                {payment === "bank" ? "Continue to bank transfer" : "Continue to card payment"}
+                {payment === "bank"
+                  ? "Continue to bank transfer"
+                  : payment === "card"
+                    ? "Continue to Paymob"
+                    : "Continue to card payment"}
                 <Lock className="ml-1.5 h-4 w-4 shrink-0" />
               </Button>
               <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-zinc-500 sm:mt-4 sm:text-xs">

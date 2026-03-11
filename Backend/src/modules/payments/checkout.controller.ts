@@ -52,10 +52,10 @@ export class CheckoutController {
   @Get('paymob-methods')
   @ApiOperation({ summary: 'List available Paymob integration types' })
   @ApiOkResponse({
-    description: 'List of Paymob methods (card, ewallet, cagg, kiosk) that are configured',
+    description: 'List of Paymob methods (card, ewallet, kiosk) that are configured',
     schema: {
       type: 'array',
-      items: { type: 'object', properties: { type: { type: 'string', enum: ['card', 'ewallet', 'cagg', 'kiosk'] }, label: { type: 'string' } } },
+      items: { type: 'object', properties: { type: { type: 'string', enum: ['card', 'ewallet', 'kiosk'] }, label: { type: 'string' } } },
     },
   })
   getPaymobMethods(): Array<{ type: string; label: string }> {

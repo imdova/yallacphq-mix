@@ -24,8 +24,8 @@ export const createPaymentSessionBodySchema = z.object({
   bankTransferProofUrl: z.string().optional(),
   /** Required when method is paymob (billing data for Paymob intention). */
   billingData: billingDataSchema.optional(),
-  /** When method is paymob: which integration to use (card, ewallet, cagg, kiosk). Omit to use all configured. */
-  paymobIntegrationType: z.enum(['card', 'ewallet', 'cagg', 'kiosk']).optional(),
+  /** When method is paymob: which integration to use (card, ewallet, kiosk). Omit to use all configured. */
+  paymobIntegrationType: z.enum(['card', 'ewallet', 'kiosk']).optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<

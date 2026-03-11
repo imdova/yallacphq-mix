@@ -41,10 +41,10 @@ export class PaymobService {
   private readonly baseUrl: string;
   private readonly hmacSecret: string | undefined;
   private readonly integrationId: number;
-  /** All integration IDs to send in payment_methods (card + ewallet + CAGG + kiosk). */
+  /** All integration IDs to send in payment_methods (card + ewallet + kiosk). */
   private readonly paymentMethodIds: number[];
   /** Map integration type to ID for dynamic frontend selection. */
-  private readonly integrationIdsByType: Record<'card' | 'ewallet' | 'cagg' | 'kiosk', number>;
+  private readonly integrationIdsByType: Record<'card' | 'ewallet' | 'kiosk', number>;
   private readonly publicKey: string | undefined;
   private readonly unifiedCheckoutBaseUrl: string;
   private readonly callbackUrl: string;
@@ -70,15 +70,13 @@ export class PaymobService {
     this.integrationId =
       this.config.get<number>('PAYMOB_INTEGRATION_ID') ?? 0;
     const ewalletId = this.config.get<number>('PAYMOB_EWALLET_INTEGRATION_ID') ?? 0;
-    const caggId = this.config.get<number>('PAYMOB_CAGG_INTEGRATION_ID') ?? 0;
     const kioskId = this.config.get<number>('PAYMOB_KIOSK_INTEGRATION_ID') ?? 0;
-    this.paymentMethodIds = [this.integrationId, ewalletId, caggId, kioskId].filter(
+    this.paymentMethodIds = [this.integrationId, ewalletId, kioskId].filter(
       (id) => id > 0,
     );
     this.integrationIdsByType = {
       card: this.integrationId,
       ewallet: ewalletId,
-      cagg: caggId,
       kiosk: kioskId,
     };
     this.publicKey = this.config.get<string>('PAYMOB_PUBLIC_KEY');
@@ -119,17 +117,16 @@ export class PaymobService {
   }
 
   /** Returns which Paymob integration types are configured (for frontend dropdown). */
-  getAvailablePaymobMethods(): Array<{ type: 'card' | 'ewallet' | 'cagg' | 'kiosk'; label: string }> {
-    const map: Array<{ type: 'card' | 'ewallet' | 'cagg' | 'kiosk'; label: string }> = [
+  getAvailablePaymobMethods(): Array<{ type: 'card' | 'ewallet' | 'kiosk'; label: string }> {
+    const map: Array<{ type: 'card' | 'ewallet' | 'kiosk'; label: string }> = [
       { type: 'card', label: 'Card (Visa/Mastercard)' },
       { type: 'ewallet', label: 'E-Wallet' },
-      { type: 'cagg', label: 'CAGG Online' },
-      { type: 'kiosk', label: 'Accept Kiosk' },
+      // { type: 'kiosk', label: 'Accept Kiosk' },
     ];
     return map.filter((m) => this.integrationIdsByType[m.type] > 0);
   }
 
-  private getIntegrationIdsForType(type: 'card' | 'ewallet' | 'cagg' | 'kiosk'): number[] {
+  private getIntegrationIdsForType(type: 'card' | 'ewallet' | 'kiosk'): number[] {
     const id = this.integrationIdsByType[type];
     return id > 0 ? [id] : [];
   }
@@ -146,7 +143,7 @@ export class PaymobService {
     currency: string,
     courseTitle: string,
     billingData: PaymobBillingData,
-    paymobIntegrationType?: 'card' | 'ewallet' | 'cagg' | 'kiosk',
+    paymobIntegrationType?: 'card' | 'ewallet' | 'kiosk',
   ): Promise<{ intentionId: string; unifiedCheckoutUrl: string }> {
     if (!this.isConfigured()) {
       throw new BadRequestException(

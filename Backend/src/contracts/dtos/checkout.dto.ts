@@ -40,10 +40,10 @@ export class CreatePaymentSessionBodyDto {
 
   @ApiProperty({
     required: false,
-    enum: ['card', 'ewallet', 'cagg', 'kiosk'],
+    enum: ['card', 'ewallet', 'kiosk'],
     description: 'When method is paymob: which integration to use. Omit to use all configured.',
   })
-  paymobIntegrationType?: 'card' | 'ewallet' | 'cagg' | 'kiosk';
+  paymobIntegrationType?: 'card' | 'ewallet' | 'kiosk';
 }
 
 export class CreatePaymentSessionResponseDto {

@@ -35,6 +35,12 @@ import { PRODUCT, STORAGE_KEY } from "@/components/features/checkout/checkoutDat
 import { apiGet } from "@/lib/api/client";
 
 const FLAG_CDN = "https://flagcdn.com";
+const DEFAULT_PAYMOB_CURRENCY =
+  (typeof process.env.NEXT_PUBLIC_PAYMOB_CURRENCY === "string" &&
+    process.env.NEXT_PUBLIC_PAYMOB_CURRENCY.trim()) ||
+  "EGP";
+const DEFAULT_PAYMOB_USD_TO_EGP =
+  Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 54.06;
 /** Map phone country code to ISO 3166-1 alpha-3 for Paymob billing_data.country */
 const COUNTRY_CODE_TO_ISO3: Record<string, string> = {
   "+20": "EGY",
@@ -71,7 +77,18 @@ const COUNTRY_CODES = [
 
 type PaymentMethod = "card" | "paypal_card" | "bank";
 
-type PaymobMethodItem = { type: "card" | "ewallet" | "cagg" | "kiosk"; label: string };
+type PaymobMethodItem = { type: "card" | "ewallet" | "kiosk"; label: string };
+type PaymobExchangeRate = {
+  currency: "EGP";
+  source: string;
+  rateDate: string | null;
+  sourceBuyRate: number | null;
+  sourceSellRate: number | null;
+  extraMarginEgp: number;
+  appliedRate: number;
+  isFallback: boolean;
+  fallbackReason?: string;
+};
 
 export function CheckoutView() {
   const router = useRouter();
@@ -83,6 +100,17 @@ export function CheckoutView() {
   const [paymobMethods, setPaymobMethods] = React.useState<PaymobMethodItem[]>([]);
   const [paymobMethodsLoading, setPaymobMethodsLoading] = React.useState(false);
   const [paymobIntegrationType, setPaymobIntegrationType] = React.useState<PaymobMethodItem["type"]>("card");
+  const [paymobRate, setPaymobRate] = React.useState<PaymobExchangeRate>({
+    currency: "EGP",
+    source: "Fallback configured rate",
+    rateDate: null,
+    sourceBuyRate: null,
+    sourceSellRate: null,
+    extraMarginEgp: 2,
+    appliedRate: DEFAULT_PAYMOB_USD_TO_EGP,
+    isFallback: true,
+  });
+  const [paymobRateLoading, setPaymobRateLoading] = React.useState(false);
   const [discountCode, setDiscountCode] = React.useState("");
   const [promoStatus, setPromoStatus] = React.useState<"idle" | "valid" | "invalid" | "loading">("idle");
   const [promoMessage, setPromoMessage] = React.useState<string | null>(null);
@@ -109,12 +137,16 @@ export function CheckoutView() {
     if (payment !== "card") return;
     let cancelled = false;
     setPaymobMethodsLoading(true);
-    apiGet<PaymobMethodItem[]>("/api/checkout/paymob-methods")
+    apiGet<PaymobMethodItem[]>("/api/checkout/paymob-methods", { cache: "no-store" })
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
-          setPaymobMethods(data);
-          if (data.length > 0 && !data.some((m) => m.type === paymobIntegrationType)) {
-            setPaymobIntegrationType(data[0].type);
+          const filtered = data.filter(
+            (m): m is PaymobMethodItem =>
+              m.type === "card" || m.type === "ewallet" || m.type === "kiosk"
+          );
+          setPaymobMethods(filtered);
+          if (filtered.length > 0 && !filtered.some((m) => m.type === paymobIntegrationType)) {
+            setPaymobIntegrationType(filtered[0].type);
           }
         }
       })
@@ -123,6 +155,34 @@ export function CheckoutView() {
       })
       .finally(() => {
         if (!cancelled) setPaymobMethodsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [payment]);
+
+  React.useEffect(() => {
+    if (payment !== "card") return;
+    let cancelled = false;
+    setPaymobRateLoading(true);
+    apiGet<PaymobExchangeRate>("/api/checkout/paymob-exchange-rate", {
+      cache: "no-store",
+    })
+      .then((data) => {
+        if (
+          !cancelled &&
+          data &&
+          typeof data.appliedRate === "number" &&
+          data.appliedRate > 0
+        ) {
+          setPaymobRate(data);
+        }
+      })
+      .catch(() => {
+        // Keep the configured fallback rate if the live CBE request fails.
+      })
+      .finally(() => {
+        if (!cancelled) setPaymobRateLoading(false);
       });
     return () => {
       cancelled = true;
@@ -170,6 +230,14 @@ export function CheckoutView() {
   const subtotal = cartCourses.length > 0 ? cartTotal : PRODUCT.price;
   const total = Math.max(0, subtotal - discountAmount);
   const useCartCheckout = cartCourses.length > 0;
+  const paymobRateValue =
+    typeof paymobRate.appliedRate === "number" && paymobRate.appliedRate > 0
+      ? paymobRate.appliedRate
+      : DEFAULT_PAYMOB_USD_TO_EGP;
+  const paymobAmount =
+    DEFAULT_PAYMOB_CURRENCY === "EGP"
+      ? Math.round(total * paymobRateValue * 100) / 100
+      : null;
 
   React.useEffect(() => {
     checkoutPayloadRef.current = {
@@ -573,23 +641,34 @@ export function CheckoutView() {
                   ${total.toFixed(2)}
                 </span>
               </div>
-              {payment === "card" && (() => {
-                const paymobCurrency = (typeof process.env.NEXT_PUBLIC_PAYMOB_CURRENCY === "string" && process.env.NEXT_PUBLIC_PAYMOB_CURRENCY.trim()) || "EGP";
-                const rate = Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 31;
-                const egpAmount = paymobCurrency === "EGP" ? Math.round((total * rate) * 100) / 100 : null;
-                return egpAmount != null ? (
-                  <p className="mt-1 text-right text-sm text-zinc-500">
-                    Paymob will charge: <span className="font-semibold text-zinc-700">{egpAmount.toFixed(2)} EGP</span>
-                  </p>
-                ) : null;
-              })()}
+              {payment === "card" && (
+                <>
+                  {paymobRateLoading ? (
+                    <p className="mt-1 text-right text-sm text-zinc-500">
+                      Loading today's CBE rate...
+                    </p>
+                  ) : paymobAmount != null ? (
+                    <>
+                      <p className="mt-1 text-right text-sm text-zinc-500">
+                        Paymob will charge: <span className="font-semibold text-zinc-700">{paymobAmount.toFixed(2)} EGP</span>
+                      </p>
+                      <p className="mt-1 text-right text-xs text-zinc-400">
+                        {paymobRate.isFallback || paymobRate.sourceSellRate == null
+                          ? `Fallback rate: ${paymobRateValue.toFixed(4)} EGP/USD`
+                          : `Today's CBE sell rate ${paymobRate.sourceSellRate.toFixed(4)} + ${paymobRate.extraMarginEgp.toFixed(2)} = ${paymobRateValue.toFixed(4)} EGP/USD`}
+                      </p>
+                    </>
+                  ) : null}
+                </>
+              )}
               {checkoutError ? (
-                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 sm:mt-4 sm:rounded-2xl sm:px-4 sm:py-3">
+                <div className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 sm:mt-4 sm:rounded-2xl sm:px-4 sm:py-3">
                   {checkoutError}
                 </div>
               ) : null}
               <Button
                 className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-semibold text-gold-foreground shadow-md hover:bg-gold/90 sm:mt-6 sm:h-12 sm:text-base"
+                disabled={payment === "card" && paymobRateLoading}
                 onClick={async () => {
                   if (!isAccountDetailsValid) {
                     setCheckoutError("Please fill in Full Name, Email Address, and Phone Number to continue.");
@@ -606,9 +685,9 @@ export function CheckoutView() {
                     return;
                   }
                   if (payment === "card") {
-                    // Paymob: integration expects EGP (or set NEXT_PUBLIC_PAYMOB_CURRENCY). Send that currency and amount in main unit (e.g. EGP).
-                    const paymobCurrency = (typeof process.env.NEXT_PUBLIC_PAYMOB_CURRENCY === "string" && process.env.NEXT_PUBLIC_PAYMOB_CURRENCY.trim()) || "EGP";
-                    const rate = Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 31;
+                    // Paymob uses today's CBE official sell rate + extra margin from our internal API.
+                    const paymobCurrency = DEFAULT_PAYMOB_CURRENCY;
+                    const rate = paymobRateValue;
                     const amountInPaymobCurrencyRaw = paymobCurrency === "EGP" ? total * rate : total;
                     // Round to 2 decimals so backend and Paymob charge the exact displayed amount.
                     const amountInPaymobCurrency = Math.round(amountInPaymobCurrencyRaw * 100) / 100;
@@ -655,7 +734,9 @@ export function CheckoutView() {
                 {payment === "bank"
                   ? "Continue to bank transfer"
                   : payment === "card"
-                    ? "Continue to Paymob"
+                    ? paymobRateLoading
+                      ? "Loading today's rate..."
+                      : "Continue to Paymob"
                     : "Continue to card payment"}
                 <Lock className="ml-1.5 h-4 w-4 shrink-0" />
               </Button>

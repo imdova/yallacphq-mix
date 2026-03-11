@@ -41,8 +41,6 @@ export const envSchema = z.object({
   PAYMOB_INTEGRATION_ID: z.coerce.number().int().optional(),
   /** Optional: ewallet integration (e.g. 5514086). Shown with card on Unified Checkout. */
   PAYMOB_EWALLET_INTEGRATION_ID: z.coerce.number().int().optional(),
-  /** Optional: CAGG-online integration (e.g. 5514085). */
-  PAYMOB_CAGG_INTEGRATION_ID: z.coerce.number().int().optional(),
   /** Optional: Accept Kiosk integration ID. */
   PAYMOB_KIOSK_INTEGRATION_ID: z.coerce.number().int().optional(),
   PAYMOB_BASE_URL: z.string().url().optional(),

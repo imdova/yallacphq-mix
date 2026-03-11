@@ -23,8 +23,8 @@ export const createPaymentSessionBodySchema = z.object({
   courseIds: z.array(z.string().min(1)).optional(),
   bankTransferProofUrl: z.string().optional(),
   billingData: billingDataSchema.optional(),
-  /** When method is paymob: which integration to use (card, ewallet, cagg, kiosk). */
-  paymobIntegrationType: z.enum(["card", "ewallet", "cagg", "kiosk"]).optional(),
+  /** When method is paymob: which integration to use (card, ewallet, kiosk). */
+  paymobIntegrationType: z.enum(["card", "ewallet", "kiosk"]).optional(),
 });
 
 export type CreatePaymentSessionBody = z.infer<typeof createPaymentSessionBodySchema>;

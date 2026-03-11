@@ -9,12 +9,27 @@ export async function GET() {
       const res = await fetch(`${getBackendUrl()}${BACKEND_API_PREFIX}/checkout/paymob-methods`, {
         method: "GET",
         headers: { Accept: "application/json" },
+        cache: "no-store",
       });
       const data = await res.json().catch(() => []);
-      if (Array.isArray(data) && data.every((m: unknown) => m && typeof m === "object" && "type" in m && "label" in m)) {
-        return jsonOk(data);
-      }
-      return jsonOk([]);
+      const filtered = Array.isArray(data)
+        ? data.filter(
+            (
+              m
+            ): m is {
+              type: "card" | "ewallet" | "kiosk";
+              label: string;
+            } =>
+              !!m &&
+              typeof m === "object" &&
+              "type" in m &&
+              "label" in m &&
+              typeof m.type === "string" &&
+              typeof m.label === "string" &&
+              ["card", "ewallet", "kiosk"].includes(m.type)
+          )
+        : [];
+      return jsonOk(filtered);
     } catch {
       return jsonOk([]);
     }

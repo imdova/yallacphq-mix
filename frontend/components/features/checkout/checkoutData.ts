@@ -14,7 +14,11 @@ export const BANK = {
 
 export const STORAGE_KEY = "yalla_checkout_payload_v1";
 
+export type CheckoutMode = "cart" | "single_course";
+
 export type StoredCheckoutPayload = {
+  checkoutMode?: CheckoutMode;
+  singleCourseId?: string;
   total: number;
   courseTitle: string;
   courseIds: string[];

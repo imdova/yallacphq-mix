@@ -14,7 +14,6 @@ import { uploadBankTransferProof } from "@/lib/dal/upload";
 import { createPaymentSession } from "@/lib/dal/orders";
 import { getErrorMessage } from "@/lib/api/error";
 import type { Course } from "@/types/course";
-import { ROUTES } from "@/constants";
 
 export function BankTransferView() {
   const router = useRouter();
@@ -42,6 +41,11 @@ export function BankTransferView() {
   }, []);
 
   React.useEffect(() => {
+    if (storedPayload?.checkoutMode === "single_course") {
+      setCartCourses([]);
+      setCartLoading(false);
+      return;
+    }
     if (courseIds.length === 0) {
       setCartCourses([]);
       setCartLoading(false);
@@ -61,7 +65,7 @@ export function BankTransferView() {
     return () => {
       cancelled = true;
     };
-  }, [courseIds]);
+  }, [courseIds, storedPayload?.checkoutMode]);
 
   const cartTotal = React.useMemo(() => {
     return cartCourses.reduce((sum, c) => {
@@ -71,11 +75,32 @@ export function BankTransferView() {
     }, 0);
   }, [cartCourses]);
 
-  const useCartCheckout = cartCourses.length > 0;
-  const subtotal = useCartCheckout ? cartTotal : PRODUCT.price;
+  const isSingleCourseCheckout =
+    storedPayload?.checkoutMode === "single_course" &&
+    !!storedPayload.singleCourseId;
+  const useCartCheckout = !isSingleCourseCheckout && cartCourses.length > 0;
+  const subtotal = isSingleCourseCheckout
+    ? storedPayload?.total ?? 0
+    : useCartCheckout
+      ? cartTotal
+      : PRODUCT.price;
   const discountAmount = storedPayload?.discountAmount ?? 0;
   const promoCode = storedPayload?.promoCode ?? "";
-  const total = Math.max(0, subtotal - discountAmount);
+  const total = isSingleCourseCheckout
+    ? storedPayload?.total ?? 0
+    : Math.max(0, subtotal - discountAmount);
+  const checkoutCourseIds = isSingleCourseCheckout
+    ? storedPayload?.courseIds?.filter(Boolean) ?? []
+    : courseIds;
+  const checkoutCourseTitle = isSingleCourseCheckout
+    ? storedPayload?.courseTitle ?? PRODUCT.name
+    : useCartCheckout
+      ? `${cartCourses.length} course(s) from Yalla CPHQ`
+      : PRODUCT.name;
+  const backHref =
+    isSingleCourseCheckout && storedPayload?.singleCourseId
+      ? `/checkout?course=${encodeURIComponent(storedPayload.singleCourseId)}`
+      : "/checkout";
 
   const ACCEPTED_RECEIPT_TYPES = "image/*,.pdf";
   const MAX_RECEIPT_SIZE_MB = 10;
@@ -117,7 +142,7 @@ export function BankTransferView() {
     setCheckoutError(null);
 
     if (status !== "authenticated" || !user) {
-      router.push(`/auth/login?next=${encodeURIComponent(ROUTES.CHECKOUT)}`);
+      router.push(`/auth/login?next=${encodeURIComponent(backHref)}`);
       return;
     }
 
@@ -126,7 +151,15 @@ export function BankTransferView() {
       return;
     }
 
-    if (!cartLoading && courseIds.length > 0 && cartCourses.length === 0) {
+    if (
+      isSingleCourseCheckout &&
+      (checkoutCourseIds.length === 0 || total <= 0)
+    ) {
+      setCheckoutError("Selected course checkout data is missing. Please return to the course page and try again.");
+      return;
+    }
+
+    if (!isSingleCourseCheckout && !cartLoading && courseIds.length > 0 && cartCourses.length === 0) {
       setCheckoutError("Your cart is empty. Add courses from the catalog.");
       return;
     }
@@ -137,13 +170,13 @@ export function BankTransferView() {
 
       await createPaymentSession({
         method: "bank",
-        courseTitle: useCartCheckout ? `${cartCourses.length} course(s) from Yalla CPHQ` : PRODUCT.name,
+        courseTitle: checkoutCourseTitle,
         currency: "USD",
         amount: total,
         discountAmount: discountAmount || undefined,
         promoCode: promoCode.trim() || undefined,
         idempotencyKey: crypto.randomUUID(),
-        ...(useCartCheckout && courseIds.length > 0 ? { courseIds } : undefined),
+        ...(checkoutCourseIds.length > 0 ? { courseIds: checkoutCourseIds } : undefined),
         bankTransferProofUrl: url,
       });
 
@@ -193,7 +226,7 @@ export function BankTransferView() {
               </p>
             </div>
             <Link
-              href="/checkout"
+              href={backHref}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
             >
               ← Back
@@ -316,7 +349,7 @@ export function BankTransferView() {
                 onClick={() => void completeBankTransfer()}
                 disabled={submitting || !receiptFile}
               >
-                {submitting ? "Processing…" : cartLoading ? "Loading…" : "Complete bank transfer"}
+                {submitting ? "Processing…" : !isSingleCourseCheckout && cartLoading ? "Loading…" : "Complete bank transfer"}
               </Button>
               <p className="mt-2 text-center text-xs text-zinc-400">
                 You’ll be redirected to your orders after upload.

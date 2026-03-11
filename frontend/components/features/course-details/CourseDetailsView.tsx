@@ -35,7 +35,6 @@ import { ROUTES } from "@/constants";
 import type { Course, CourseCurriculumItem, CourseReviewMediaItem } from "@/types/course";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
-import { useCart } from "@/contexts/cart-context";
 import { getErrorMessage } from "@/lib/api/error";
 import { youtubeEmbedUrl, youtubeThumbUrl } from "./reviewMedia";
 
@@ -238,9 +237,6 @@ export function CourseDetailsView() {
   const [enrolling, setEnrolling] = React.useState(false);
   const [enrollError, setEnrollError] = React.useState<string | null>(null);
   const [enrollSuccess, setEnrollSuccess] = React.useState(false);
-  const { addToCart, isInCart } = useCart();
-  const inCart = courseId ? isInCart(courseId) : false;
-
   React.useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -382,7 +378,9 @@ export function CourseDetailsView() {
     setEnrollSuccess(false);
 
     if (status !== "authenticated" || !user) {
-      const next = `/course-details?course=${encodeURIComponent(courseId)}`;
+      const next = isFree
+        ? `/course-details?course=${encodeURIComponent(courseId)}`
+        : `${ROUTES.CHECKOUT}?course=${encodeURIComponent(courseId)}`;
       router.push(`/auth/login?next=${encodeURIComponent(next)}`);
       return;
     }
@@ -402,10 +400,7 @@ export function CourseDetailsView() {
     }
 
     setEnrolling(true);
-    addToCart(courseId)
-      .then(() => router.push(ROUTES.CHECKOUT))
-      .catch((e) => setEnrollError(getErrorMessage(e, "Failed to add to cart")))
-      .finally(() => setEnrolling(false));
+    router.push(`${ROUTES.CHECKOUT}?course=${encodeURIComponent(courseId)}`);
   };
 
   if (loading && !course && courseId) {
@@ -1206,9 +1201,7 @@ export function CourseDetailsView() {
                       : "Adding…"
                     : isFree
                       ? "Start Learning"
-                      : inCart
-                        ? "Proceed to checkout"
-                        : "Start Learning"}
+                      : "Proceed to checkout"}
                 </button>
               </CardContent>
             </Card>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,11 @@ import { validatePromoCode } from "@/lib/dal/promo-codes";
 import { createPaymentSession } from "@/lib/dal/orders";
 import { getPublicCourse } from "@/lib/dal/courses";
 import type { Course } from "@/types/course";
-import { PRODUCT, STORAGE_KEY } from "@/components/features/checkout/checkoutData";
+import {
+  PRODUCT,
+  STORAGE_KEY,
+  type CheckoutMode,
+} from "@/components/features/checkout/checkoutData";
 import { apiGet } from "@/lib/api/client";
 
 const FLAG_CDN = "https://flagcdn.com";
@@ -41,6 +45,15 @@ const DEFAULT_PAYMOB_CURRENCY =
   "EGP";
 const DEFAULT_PAYMOB_USD_TO_EGP =
   Number(process.env.NEXT_PUBLIC_PAYMOB_USD_TO_EGP) || 54.06;
+
+function getCourseCheckoutPrice(course?: Pick<Course, "priceRegular" | "priceSale"> | null) {
+  if (!course) return 0;
+  const hasSale =
+    course.priceSale != null &&
+    course.priceSale > 0 &&
+    (course.priceRegular ?? 0) > (course.priceSale ?? 0);
+  return hasSale ? (course.priceSale ?? 0) : (course.priceRegular ?? 0);
+}
 /** Map phone country code to ISO 3166-1 alpha-3 for Paymob billing_data.country */
 const COUNTRY_CODE_TO_ISO3: Record<string, string> = {
   "+20": "EGY",
@@ -92,10 +105,14 @@ type PaymobExchangeRate = {
 
 export function CheckoutView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   useAuth(); // ensure auth context is available
   const { courseIds } = useCart();
+  const directCourseId = searchParams.get("course")?.trim() ?? "";
   const [cartCourses, setCartCourses] = React.useState<Course[]>([]);
   const [cartLoading, setCartLoading] = React.useState(true);
+  const [directCourse, setDirectCourse] = React.useState<Course | null>(null);
+  const [directCourseLoading, setDirectCourseLoading] = React.useState(false);
   const [payment, setPayment] = React.useState<PaymentMethod>("card");
   const [paymobMethods, setPaymobMethods] = React.useState<PaymobMethodItem[]>([]);
   const [paymobMethodsLoading, setPaymobMethodsLoading] = React.useState(false);
@@ -162,6 +179,26 @@ export function CheckoutView() {
   }, [payment]);
 
   React.useEffect(() => {
+    if (!directCourseId) {
+      setDirectCourse(null);
+      setDirectCourseLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setDirectCourseLoading(true);
+    getPublicCourse(directCourseId)
+      .then((course) => {
+        if (!cancelled) setDirectCourse(course);
+      })
+      .finally(() => {
+        if (!cancelled) setDirectCourseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [directCourseId]);
+
+  React.useEffect(() => {
     if (payment !== "card") return;
     let cancelled = false;
     setPaymobRateLoading(true);
@@ -220,6 +257,8 @@ export function CheckoutView() {
   }, [cartCourses]);
 
   const checkoutPayloadRef = React.useRef({
+    checkoutMode: "cart" as CheckoutMode,
+    singleCourseId: undefined as string | undefined,
     total: 0,
     courseTitle: PRODUCT.name,
     courseIds: [] as string[],
@@ -227,9 +266,17 @@ export function CheckoutView() {
     promoCode: "",
   });
 
-  const subtotal = cartCourses.length > 0 ? cartTotal : PRODUCT.price;
+  const isSingleCourseCheckout = !!directCourseId && !!directCourse;
+  const isDirectCourseMissing =
+    !!directCourseId && !directCourseLoading && !directCourse;
+  const singleCoursePrice = getCourseCheckoutPrice(directCourse);
+  const subtotal = directCourseId
+    ? singleCoursePrice
+    : cartCourses.length > 0
+      ? cartTotal
+      : PRODUCT.price;
   const total = Math.max(0, subtotal - discountAmount);
-  const useCartCheckout = cartCourses.length > 0;
+  const useCartCheckout = !directCourseId && cartCourses.length > 0;
   const paymobRateValue =
     typeof paymobRate.appliedRate === "number" && paymobRate.appliedRate > 0
       ? paymobRate.appliedRate
@@ -241,15 +288,37 @@ export function CheckoutView() {
 
   React.useEffect(() => {
     checkoutPayloadRef.current = {
+      checkoutMode: isSingleCourseCheckout ? "single_course" : "cart",
+      singleCourseId: isSingleCourseCheckout ? directCourse.id : undefined,
       total,
-      courseTitle: useCartCheckout ? `${cartCourses.length} course(s) from Yalla CPHQ` : PRODUCT.name,
-      courseIds: useCartCheckout ? courseIds : [],
+      courseTitle: isSingleCourseCheckout
+        ? directCourse.title
+        : useCartCheckout
+          ? `${cartCourses.length} course(s) from Yalla CPHQ`
+          : PRODUCT.name,
+      courseIds: isSingleCourseCheckout
+        ? [directCourse.id]
+        : useCartCheckout
+          ? courseIds
+          : [],
       discountAmount,
       promoCode: discountCode.trim(),
     };
-  }, [total, useCartCheckout, cartCourses.length, courseIds, discountAmount, discountCode]);
+  }, [
+    total,
+    isSingleCourseCheckout,
+    directCourse,
+    useCartCheckout,
+    cartCourses.length,
+    courseIds,
+    discountAmount,
+    discountCode,
+  ]);
 
   const applyPromo = async () => {
+    if (directCourseId && !directCourse) {
+      return;
+    }
     const code = discountCode.trim();
     if (!code) {
       setPromoStatus("idle");
@@ -260,7 +329,7 @@ export function CheckoutView() {
     setPromoStatus("loading");
     setPromoMessage(null);
     try {
-      const courseIdForPromo = cartCourses.length > 0 ? (cartCourses[0]?.id ?? "bundle-cphq") : "bundle-cphq";
+      const courseIdForPromo = directCourse?.id ?? (cartCourses.length > 0 ? (cartCourses[0]?.id ?? "bundle-cphq") : "bundle-cphq");
       const res = await validatePromoCode(courseIdForPromo, code);
       setDiscountAmount(res.discountAmount);
       setPromoStatus("valid");
@@ -569,7 +638,21 @@ export function CheckoutView() {
                 </span>
               </div>
               <ul className="mt-4 space-y-3 sm:mt-6">
-                {cartLoading ? (
+                {directCourseId ? (
+                  directCourseLoading ? (
+                    <li className="text-sm text-zinc-500">Loading selected course…</li>
+                  ) : directCourse ? (
+                    <li className="min-w-0">
+                      <p className="truncate font-medium text-zinc-900">{directCourse.title}</p>
+                      <p className="text-xs text-zinc-500 sm:text-sm">{directCourse.instructorName}</p>
+                      <p className="mt-1 font-semibold text-zinc-900">
+                        ${singleCoursePrice.toFixed(2)}
+                      </p>
+                    </li>
+                  ) : (
+                    <li className="text-sm text-rose-600">Selected course not found.</li>
+                  )
+                ) : cartLoading ? (
                   <li className="text-sm text-zinc-500">Loading cart…</li>
                 ) : cartCourses.length > 0 ? (
                   cartCourses.map((c) => {
@@ -615,7 +698,7 @@ export function CheckoutView() {
                   type="button"
                   variant="default"
                   className="h-10 w-full shrink-0 rounded-xl bg-black text-white hover:bg-black/90 disabled:opacity-60 sm:w-auto"
-                  disabled={promoStatus === "loading"}
+                  disabled={promoStatus === "loading" || directCourseLoading || isDirectCourseMissing}
                   onClick={() => void applyPromo()}
                 >
                   {promoStatus === "loading" ? "Applying…" : "Apply"}
@@ -668,8 +751,12 @@ export function CheckoutView() {
               ) : null}
               <Button
                 className="mt-4 h-11 w-full rounded-xl bg-gold text-sm font-semibold text-gold-foreground shadow-md hover:bg-gold/90 sm:mt-6 sm:h-12 sm:text-base"
-                disabled={payment === "card" && paymobRateLoading}
+                disabled={directCourseLoading || isDirectCourseMissing || (payment === "card" && paymobRateLoading)}
                 onClick={async () => {
+                  if (isDirectCourseMissing) {
+                    setCheckoutError("Selected course not found.");
+                    return;
+                  }
                   if (!isAccountDetailsValid) {
                     setCheckoutError("Please fill in Full Name, Email Address, and Phone Number to continue.");
                     return;

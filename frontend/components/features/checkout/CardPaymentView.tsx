@@ -41,6 +41,10 @@ export function CardPaymentView() {
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
   const pendingPayPalOrderRef = React.useRef<{ id: string } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const backHref =
+    payload?.checkoutMode === "single_course" && payload.singleCourseId
+      ? `/checkout?course=${encodeURIComponent(payload.singleCourseId)}`
+      : "/checkout";
 
   React.useEffect(() => {
     try {
@@ -86,6 +90,10 @@ export function CardPaymentView() {
             .then((res) => {
               pendingPayPalOrderRef.current = res.order;
               const origin = typeof window !== "undefined" ? window.location.origin : "";
+              const cancelUrl =
+                payload.checkoutMode === "single_course" && payload.singleCourseId
+                  ? `${origin}/checkout?course=${encodeURIComponent(payload.singleCourseId)}&paypal_cancel=1`
+                  : `${origin}/checkout?paypal_cancel=1`;
               return actions.order.create({
                 purchase_units: [
                   {
@@ -95,7 +103,7 @@ export function CardPaymentView() {
                 ],
                 application_context: {
                   return_url: `${origin}/checkout/paypal-return?our_order_id=${encodeURIComponent(res.order.id)}`,
-                  cancel_url: `${origin}/checkout?paypal_cancel=1`,
+                  cancel_url: cancelUrl,
                 },
               });
             })
@@ -184,7 +192,7 @@ export function CardPaymentView() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 p-6">
         <p className="text-zinc-600">Loading…</p>
-        <Link href="/checkout" className="mt-4 text-sm text-gold hover:underline">
+        <Link href={backHref} className="mt-4 text-sm text-gold hover:underline">
           ← Back to checkout
         </Link>
       </div>
@@ -226,7 +234,7 @@ export function CardPaymentView() {
               </p>
             </div>
             <Link
-              href="/checkout"
+              href={backHref}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
             >
               ← Back

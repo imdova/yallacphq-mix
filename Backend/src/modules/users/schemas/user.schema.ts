@@ -15,8 +15,29 @@ export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
 
+  @Prop({ default: false })
+  emailVerified!: boolean;
+
   @Prop({ required: true })
   passwordHash!: string;
+
+  @Prop()
+  emailVerificationTokenHash?: string;
+
+  @Prop()
+  emailVerificationOtpHash?: string;
+
+  @Prop()
+  emailVerificationExpiresAt?: Date;
+
+  @Prop()
+  passwordResetTokenHash?: string;
+
+  @Prop()
+  passwordResetOtpHash?: string;
+
+  @Prop()
+  passwordResetExpiresAt?: Date;
 
   @Prop({ required: true, enum: Role, default: Role.student })
   role!: Role;

@@ -7,8 +7,10 @@ import {
   changePasswordResponseSchema,
   forgotPasswordResponseSchema,
   loginBodySchema,
+  resendVerificationResponseSchema,
   resetPasswordResponseSchema,
   signupBodySchema,
+  verifyEmailResponseSchema,
 } from "@/lib/api/contracts/auth";
 import type { ChangePasswordBody } from "@/lib/api/contracts/auth";
 import type { z } from "zod";
@@ -44,12 +46,33 @@ export async function authForgotPassword(email: string) {
   return apiPost("/api/auth/forgot-password", { email }, { schema: forgotPasswordResponseSchema });
 }
 
-export async function authResetPassword(token: string, newPassword: string) {
+export async function authResetPassword(input: {
+  token?: string;
+  email?: string;
+  otp?: string;
+  newPassword: string;
+}) {
   return apiPost(
     "/api/auth/reset-password",
-    { token, newPassword },
+    input,
     { schema: resetPasswordResponseSchema }
   );
+}
+
+export async function authVerifyEmail(input: {
+  token?: string;
+  email?: string;
+  otp?: string;
+}) {
+  return apiPost("/api/auth/verify-email", input, {
+    schema: verifyEmailResponseSchema,
+  });
+}
+
+export async function authResendVerification(email: string) {
+  return apiPost("/api/auth/resend-verification", { email }, {
+    schema: resendVerificationResponseSchema,
+  });
 }
 
 export async function changePassword(body: ChangePasswordBody) {

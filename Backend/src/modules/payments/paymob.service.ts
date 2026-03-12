@@ -2,10 +2,8 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
+import { OrderCompletionService } from '../orders/order-completion.service';
 import { OrdersService } from '../orders/orders.service';
-import { UsersService } from '../users/users.service';
-import { CoursesService } from '../courses/courses.service';
-import { PromoCodesService } from '../promo-codes/promo-codes.service';
 
 export interface PaymobBillingData {
   first_name: string;
@@ -59,9 +57,7 @@ export class PaymobService {
   constructor(
     private readonly config: ConfigService,
     private readonly orders: OrdersService,
-    private readonly users: UsersService,
-    private readonly courses: CoursesService,
-    private readonly promoCodes: PromoCodesService,
+    private readonly orderCompletion: OrderCompletionService,
   ) {
     this.secretKey = this.config.get<string>('PAYMOB_SECRET_KEY');
     this.baseUrl =
@@ -257,13 +253,42 @@ export class PaymobService {
     receivedHmac: string,
   ): boolean {
     if (!this.hmacSecret) return false;
+    const candidates = new Set<string>();
     const { hmac: _hmac, ...rest } = body;
-    const payload = JSON.stringify(rest);
-    const computed = crypto
-      .createHmac('sha512', this.hmacSecret)
-      .update(payload)
-      .digest('hex');
-    return computed === receivedHmac;
+
+    candidates.add(JSON.stringify(rest));
+
+    const transaction = body.transaction;
+    if (transaction && typeof transaction === 'object') {
+      const tx = transaction as Record<string, unknown>;
+      const concat = Object.keys(tx)
+        .sort()
+        .map((key) => `${tx[key]}`)
+        .join('');
+      candidates.add(concat);
+    }
+
+    const intention = body.intention;
+    if (intention && typeof intention === 'object') {
+      const intent = intention as Record<string, unknown>;
+      const concat = Object.keys(intent)
+        .sort()
+        .map((key) => `${intent[key]}`)
+        .join('');
+      candidates.add(concat);
+    }
+
+    for (const payload of candidates) {
+      const computed = crypto
+        .createHmac('sha512', this.hmacSecret)
+        .update(payload)
+        .digest('hex');
+      if (computed === receivedHmac) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   async handleCallback(
@@ -352,19 +377,10 @@ export class PaymobService {
         status: 'paid',
         transactionId,
       });
-      if (updated?.promoCode?.trim()) {
-        await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());
-      }
-      if (updated?.userId && updated.courseIds?.length) {
-        for (const courseId of updated.courseIds) {
-          const added = await this.users.addEnrolledCourse(
-            updated.userId!,
-            courseId,
-          );
-          if (added) {
-            await this.courses.incrementEnrolledCount(courseId, 1);
-          }
-        }
+      if (updated) {
+        await this.orderCompletion.handlePaidOrder(updated, {
+          providerLabel: 'Paymob',
+        });
       }
       this.logger.log(`Paymob order ${orderId} marked paid`);
     } else {

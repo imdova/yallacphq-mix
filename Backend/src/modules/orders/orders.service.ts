@@ -114,6 +114,7 @@ export class OrdersService {
       .updateMany(
         {
           status: 'pending',
+          provider: { $ne: 'manual' },
           createdAt: { $lte: cutoff },
         },
         {

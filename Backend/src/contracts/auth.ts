@@ -24,12 +24,49 @@ export const forgotPasswordBodySchema = z.object({
 
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
 
+const otpSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'OTP must be 6 digits');
+
 export const resetPasswordBodySchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  otp: otpSchema.optional(),
   newPassword: z.string().min(8),
+}).superRefine((value, ctx) => {
+  if (!value.token && !(value.email && value.otp)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['token'],
+      message: 'Provide either token or email + otp',
+    });
+  }
 });
 
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;
+
+export const verifyEmailBodySchema = z.object({
+  token: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  otp: otpSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (!value.token && !(value.email && value.otp)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['token'],
+      message: 'Provide either token or email + otp',
+    });
+  }
+});
+
+export type VerifyEmailBody = z.infer<typeof verifyEmailBodySchema>;
+
+export const resendVerificationBodySchema = z.object({
+  email: z.string().email(),
+});
+
+export type ResendVerificationBody = z.infer<typeof resendVerificationBodySchema>;
 
 export const authMeResponseSchema = z.object({
   user: userSchema.nullable(),
@@ -70,6 +107,20 @@ export const resetPasswordResponseSchema = z.object({
 });
 
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
+
+export const verifyEmailResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
+export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
+
+export const resendVerificationResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+export type ResendVerificationResponse = z.infer<
+  typeof resendVerificationResponseSchema
+>;
 
 export const changePasswordBodySchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),

@@ -29,6 +29,14 @@ export const envSchema = z.object({
   AWS_SECRET_KEY: z.string().optional(),
   AWS_BUCKET_NAME: z.string().optional(),
 
+  // App / email links
+  FRONTEND_URL: z.string().url().optional(),
+  APP_URL: z.string().url().optional(),
+
+  // SMTP / email
+  SMTP_TRANSPORT: z.string().optional(),
+  SMTP_DEMO_EMAIL: z.string().email().optional(),
+
   // PayPal (optional – required only for server-side capture on checkout confirm)
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_SECRET: z.string().optional(),

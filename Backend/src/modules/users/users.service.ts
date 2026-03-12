@@ -43,6 +43,10 @@ export class UsersService {
     });
   }
 
+  async findByEmail(email: string) {
+    return this.userModel.findOne({ email: email.trim().toLowerCase() }).exec();
+  }
+
   async findOne(filter: Partial<Pick<User, 'email' | 'role'>>) {
     return this.userModel.findOne(filter).exec();
   }
@@ -161,10 +165,135 @@ export class UsersService {
       .exec();
   }
 
+  async setEmailVerificationChallenge(
+    userId: string,
+    params: { tokenHash: string; otpHash: string; expiresAt: Date },
+  ) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            emailVerificationTokenHash: params.tokenHash,
+            emailVerificationOtpHash: params.otpHash,
+            emailVerificationExpiresAt: params.expiresAt,
+            emailVerified: false,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async findByEmailVerificationTokenHash(tokenHash: string) {
+    return this.userModel
+      .findOne({
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpiresAt: { $gt: new Date() },
+      })
+      .exec();
+  }
+
+  async findByEmailVerificationOtp(email: string, otpHash: string) {
+    return this.userModel
+      .findOne({
+        email: email.trim().toLowerCase(),
+        emailVerificationOtpHash: otpHash,
+        emailVerificationExpiresAt: { $gt: new Date() },
+      })
+      .exec();
+  }
+
+  async markEmailVerified(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: { emailVerified: true },
+          $unset: {
+            emailVerificationTokenHash: 1,
+            emailVerificationOtpHash: 1,
+            emailVerificationExpiresAt: 1,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async setPasswordResetChallenge(
+    userId: string,
+    params: { tokenHash: string; otpHash: string; expiresAt: Date },
+  ) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            passwordResetTokenHash: params.tokenHash,
+            passwordResetOtpHash: params.otpHash,
+            passwordResetExpiresAt: params.expiresAt,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async findByPasswordResetTokenHash(tokenHash: string) {
+    return this.userModel
+      .findOne({
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+      })
+      .exec();
+  }
+
+  async findByPasswordResetOtp(email: string, otpHash: string) {
+    return this.userModel
+      .findOne({
+        email: email.trim().toLowerCase(),
+        passwordResetOtpHash: otpHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+      })
+      .exec();
+  }
+
+  async clearPasswordResetChallenge(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $unset: {
+            passwordResetTokenHash: 1,
+            passwordResetOtpHash: 1,
+            passwordResetExpiresAt: 1,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
   async setPasswordHash(userId: string, passwordHash: string) {
     if (!Types.ObjectId.isValid(userId)) return null;
     return this.userModel
-      .findByIdAndUpdate(userId, { $set: { passwordHash } }, { new: true })
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: { passwordHash },
+          $unset: {
+            passwordResetTokenHash: 1,
+            passwordResetOtpHash: 1,
+            passwordResetExpiresAt: 1,
+          },
+        },
+        { new: true },
+      )
       .exec();
   }
 

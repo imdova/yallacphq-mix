@@ -41,6 +41,9 @@ export async function POST(req: Request) {
 
   try {
     const body = resetPasswordBodySchema.parse(await req.json());
+    if (!body.token) {
+      return jsonError(501, "OTP reset requires the backend");
+    }
     const email = await consumeResetToken(body.token);
     if (!email) return jsonError(400, "Invalid or expired token");
 

@@ -36,9 +36,13 @@ import {
   ForgotPasswordBodyDto,
   ForgotPasswordResponseDto,
   LoginBodyDto,
+  ResendVerificationBodyDto,
+  ResendVerificationResponseDto,
   ResetPasswordBodyDto,
   ResetPasswordResponseDto,
   SignupBodyDto,
+  VerifyEmailBodyDto,
+  VerifyEmailResponseDto,
 } from '../../contracts/dtos';
 import { AuthService } from './auth.service';
 import {
@@ -51,15 +55,21 @@ import {
   forgotPasswordBodySchema,
   forgotPasswordResponseSchema,
   loginBodySchema,
+  resendVerificationBodySchema,
+  resendVerificationResponseSchema,
   resetPasswordBodySchema,
   resetPasswordResponseSchema,
   signupBodySchema,
+  verifyEmailBodySchema,
+  verifyEmailResponseSchema,
 } from '../../contracts';
 import type {
   ForgotPasswordBody,
   LoginBody,
+  ResendVerificationBody,
   ResetPasswordBody,
   SignupBody,
+  VerifyEmailBody,
 } from '../../contracts';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
@@ -213,8 +223,7 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(forgotPasswordBodySchema))
   @ResponseSchema(forgotPasswordResponseSchema)
   forgotPassword(@Body() body: ForgotPasswordBody) {
-    void body;
-    return { success: true };
+    return this.auth.forgotPassword(body.email);
   }
 
   @Post('reset-password')
@@ -229,8 +238,37 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(resetPasswordBodySchema))
   @ResponseSchema(resetPasswordResponseSchema)
   resetPassword(@Body() body: ResetPasswordBody) {
-    void body;
-    return { ok: true };
+    return this.auth.resetPassword(body);
+  }
+
+  @Post('verify-email')
+  @Version('1')
+  @ApiOperation({
+    summary: 'Verify email',
+    description: 'Verify account using email link token or email + OTP',
+  })
+  @ApiBody({ type: VerifyEmailBodyDto })
+  @ApiOkResponse({ type: VerifyEmailResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorDto })
+  @UsePipes(new ZodValidationPipe(verifyEmailBodySchema))
+  @ResponseSchema(verifyEmailResponseSchema)
+  verifyEmail(@Body() body: VerifyEmailBody) {
+    return this.auth.verifyEmail(body);
+  }
+
+  @Post('resend-verification')
+  @Version('1')
+  @ApiOperation({
+    summary: 'Resend verification email',
+    description: 'Send a new verification email / OTP',
+  })
+  @ApiBody({ type: ResendVerificationBodyDto })
+  @ApiOkResponse({ type: ResendVerificationResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorDto })
+  @UsePipes(new ZodValidationPipe(resendVerificationBodySchema))
+  @ResponseSchema(resendVerificationResponseSchema)
+  resendVerification(@Body() body: ResendVerificationBody) {
+    return this.auth.resendVerificationEmail(body.email);
   }
 
   @Get('me')

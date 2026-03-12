@@ -39,19 +39,15 @@ import type { CreateOrderBody, UpdateOrderBody } from '../../contracts';
 import { ApiOkDto, ListOrdersResponseDto } from '../../contracts/dtos';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { toApiOrder } from './order.mapper';
+import { OrderCompletionService } from './order-completion.service';
 import { OrdersService } from './orders.service';
-import { UsersService } from '../users/users.service';
-import { CoursesService } from '../courses/courses.service';
-import { PromoCodesService } from '../promo-codes/promo-codes.service';
 
 @ApiTags('admin')
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(
     private readonly orders: OrdersService,
-    private readonly users: UsersService,
-    private readonly courses: CoursesService,
-    private readonly promoCodes: PromoCodesService,
+    private readonly orderCompletion: OrderCompletionService,
   ) {}
 
   @Get()
@@ -148,6 +144,8 @@ export class AdminOrdersController {
       });
     }
     const body: UpdateOrderBody = parsed.data;
+    const existing = await this.orders.findById(id);
+    if (!existing) throw new NotFoundException('Order not found');
 
     const patch: UpdateOrderBody = { ...body };
     if (body.status === 'paid') {
@@ -155,21 +153,14 @@ export class AdminOrdersController {
     }
     const updated = await this.orders.updateById(id, patch);
     if (!updated) throw new NotFoundException('Order not found');
-    if (body.status === 'paid' && updated.status === 'paid') {
-      if (updated.promoCode?.trim()) {
-        await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());
-      }
-      if (updated.userId && updated.courseIds?.length) {
-        for (const courseId of updated.courseIds) {
-          const newlyAdded = await this.users.addEnrolledCourse(
-            updated.userId,
-            courseId,
-          );
-          if (newlyAdded) {
-            await this.courses.incrementEnrolledCount(courseId, 1);
-          }
-        }
-      }
+    if (
+      body.status === 'paid' &&
+      existing.status !== 'paid' &&
+      updated.status === 'paid'
+    ) {
+      await this.orderCompletion.handlePaidOrder(updated, {
+        providerLabel: 'Bank Transfer',
+      });
     }
     return { order: toApiOrder(updated) };
   }

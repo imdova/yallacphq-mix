@@ -12,6 +12,9 @@ export class ApiUserDto {
   @ApiProperty({ example: 'student@example.com', format: 'email' })
   email!: string;
 
+  @ApiProperty({ required: false, example: false })
+  emailVerified?: boolean;
+
   @ApiProperty({ example: 'Jane Student' })
   name!: string;
 

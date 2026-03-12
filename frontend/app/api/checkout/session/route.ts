@@ -20,7 +20,8 @@ type SessionRecord = {
 
 const sessionsByIdempotencyKey = new Map<string, SessionRecord>();
 
-function providerForMethod(method: "paypal" | "card" | "bank"): SessionRecord["provider"] {
+function providerForMethod(method: "paypal" | "card" | "bank" | "paymob"): SessionRecord["provider"] {
+  if (method === "paymob") return "paymob";
   if (method === "bank") return "manual";
   // demo mapping: treat PayPal/card as "stripe" provider
   return "stripe";

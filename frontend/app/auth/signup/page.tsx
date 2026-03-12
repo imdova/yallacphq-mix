@@ -119,7 +119,7 @@ export default function AuthSignupPage() {
               Create Your Account
             </h1>
             <p className="mt-1 text-zinc-600">
-              Start your journey toward CPHQ certification today.
+              Start your journey toward CPHQ certification today. We&apos;ll send a verification email after signup.
             </p>
 
             <form className="mt-8 space-y-5" onSubmit={submit}>

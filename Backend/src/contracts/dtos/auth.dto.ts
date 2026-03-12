@@ -80,14 +80,72 @@ export class ForgotPasswordResponseDto extends ApiSuccessDto {
 }
 
 export class ResetPasswordBodyDto {
-  @ApiProperty({ example: 'reset_token_123', minLength: 1 })
-  token!: string;
+  @ApiProperty({
+    required: false,
+    example: 'reset_token_123',
+    minLength: 1,
+    description: 'Reset link token',
+  })
+  token?: string;
+
+  @ApiProperty({
+    required: false,
+    example: 'student@example.com',
+    format: 'email',
+    description: 'Required when resetting with OTP',
+  })
+  email?: string;
+
+  @ApiProperty({
+    required: false,
+    example: '123456',
+    minLength: 6,
+    maxLength: 6,
+    description: '6-digit OTP code sent by email',
+  })
+  otp?: string;
 
   @ApiProperty({ example: 'NewStrongPassw0rd!', minLength: 8 })
   newPassword!: string;
 }
 
 export class ResetPasswordResponseDto extends ApiOkDto {}
+
+export class VerifyEmailBodyDto {
+  @ApiProperty({
+    required: false,
+    example: 'verify_token_123',
+    minLength: 1,
+    description: 'Verification link token',
+  })
+  token?: string;
+
+  @ApiProperty({
+    required: false,
+    example: 'student@example.com',
+    format: 'email',
+    description: 'Required when verifying with OTP',
+  })
+  email?: string;
+
+  @ApiProperty({
+    required: false,
+    example: '123456',
+    minLength: 6,
+    maxLength: 6,
+    description: '6-digit OTP code sent by email',
+  })
+  otp?: string;
+}
+
+export class VerifyEmailResponseDto extends ApiOkDto {}
+
+export class ResendVerificationBodyDto {
+  @ApiProperty({ example: 'student@example.com', format: 'email' })
+  email!: string;
+}
+
+export class ResendVerificationResponseDto extends ApiSuccessDto {}
 
 export class ChangePasswordBodyDto {
   @ApiProperty({ example: 'CurrentPassw0rd!', description: 'Current password' })

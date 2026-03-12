@@ -16,10 +16,9 @@ import type {
 } from '../../contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrdersService } from '../orders/orders.service';
+import { OrderCompletionService } from '../orders/order-completion.service';
 import { toApiOrder } from '../orders/order.mapper';
 import { UsersService } from '../users/users.service';
-import { CoursesService } from '../courses/courses.service';
-import { PromoCodesService } from '../promo-codes/promo-codes.service';
 import { PaypalCaptureService } from './paypal-capture.service';
 import { PaymobService } from './paymob.service';
 import {
@@ -43,8 +42,7 @@ export class CheckoutController {
   constructor(
     private readonly orders: OrdersService,
     private readonly users: UsersService,
-    private readonly courses: CoursesService,
-    private readonly promoCodes: PromoCodesService,
+    private readonly orderCompletion: OrderCompletionService,
     private readonly paypalCapture: PaypalCaptureService,
     private readonly paymobService: PaymobService,
   ) {}
@@ -197,23 +195,16 @@ export class CheckoutController {
     if (!updated) {
       throw new NotFoundException('Order not found');
     }
-    if (updated.status === 'paid' && updated.promoCode?.trim()) {
-      await this.promoCodes.incrementUsageByCode(updated.promoCode.trim());
-    }
-    if (
-      updated.status === 'paid' &&
-      updated.userId &&
-      updated.courseIds?.length
-    ) {
-      for (const courseId of updated.courseIds) {
-        const newlyAdded = await this.users.addEnrolledCourse(
-          updated.userId,
-          courseId,
-        );
-        if (newlyAdded) {
-          await this.courses.incrementEnrolledCount(courseId, 1);
-        }
-      }
+
+    if (updated.status === 'paid') {
+      await this.orderCompletion.handlePaidOrder(updated, {
+        providerLabel:
+          updated.provider === 'paymob'
+            ? 'Paymob'
+            : body.transactionId
+              ? 'PayPal'
+              : 'Card Payment',
+      });
     }
     return { ok: true, order: toApiOrder(updated) };
   }

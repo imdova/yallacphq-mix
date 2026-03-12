@@ -9,6 +9,13 @@ export const dynamic = "force-dynamic";
 
 const ACCESS_TOKEN_COOKIE = "access_token";
 
+function forwardSetCookie(from: Response, to: NextResponse) {
+  const setCookies = from.headers.getSetCookie?.();
+  if (setCookies?.length) {
+    for (const c of setCookies) to.headers.append("Set-Cookie", c);
+  }
+}
+
 function setAccessTokenCookie(res: NextResponse, token: string) {
   res.cookies.set(ACCESS_TOKEN_COOKIE, token, {
     httpOnly: true,
@@ -51,7 +58,12 @@ export async function POST(req: Request) {
         { user },
         { status: 201, headers: { "x-request-id": requestId } }
       );
-      setAccessTokenCookie(nextRes, accessToken);
+      const setCookies = res.headers.getSetCookie?.();
+      if (setCookies?.length) {
+        forwardSetCookie(res, nextRes);
+      } else {
+        setAccessTokenCookie(nextRes, accessToken);
+      }
       return nextRes;
     } catch (err) {
       if (err instanceof ZodError) {

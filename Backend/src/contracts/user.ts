@@ -6,6 +6,7 @@ export const userRoleSchema = z.enum(['admin', 'student']);
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
+  emailVerified: z.boolean().optional(),
   name: z.string(),
   role: userRoleSchema,
   enrolled: z.boolean().optional(),

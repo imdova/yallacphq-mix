@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { CheckoutView } from "@/components/features/checkout/CheckoutView";
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function CheckoutPage() {
-  return <CheckoutView />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50" />}>
+      <CheckoutView />
+    </Suspense>
+  );
 }

@@ -19,9 +19,12 @@ export function ResetPasswordClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const email = searchParams.get("email") ?? "";
+  const usingToken = Boolean(token);
 
   const [password, setPassword] = React.useState("");
   const [confirm, setConfirm] = React.useState("");
+  const [otp, setOtp] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -34,16 +37,22 @@ export function ResetPasswordClient() {
   const hasSpecial = requirementMet(password, (v) => /[!@#$%]/.test(v));
   const allMet = min8 && hasUpper && hasNumber && hasSpecial;
   const match = password.length > 0 && password === confirm;
+  const hasResetIdentifier = usingToken || Boolean(email);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!hasResetIdentifier) return;
     if (!allMet || !match) return;
+    if (!usingToken && otp.length !== 6) return;
     setLoading(true);
     setError(null);
     setSuccess(false);
     try {
-      await authResetPassword(token, password);
+      await authResetPassword(
+        usingToken
+          ? { token: token ?? undefined, newPassword: password }
+          : { email, otp, newPassword: password }
+      );
       setSuccess(true);
       window.setTimeout(() => router.push("/auth/login"), 700);
     } catch (err) {
@@ -74,17 +83,41 @@ export function ResetPasswordClient() {
             Choose a strong password to secure your account.
           </p>
 
-          {!token && (
+          {!hasResetIdentifier && (
             <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-zinc-700">
-              <p className="font-medium text-destructive">Missing token</p>
+              <p className="font-medium text-destructive">Missing reset details</p>
               <p className="mt-1">
-                Please use the reset link from your email. It contains a required
-                token.
+                Please use the reset link from your email or open this page with
+                your email address so you can enter the OTP code.
               </p>
             </div>
           )}
 
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+            {!usingToken ? (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                    Email
+                  </Label>
+                  <Input value={email} readOnly className="h-11 rounded-lg border-zinc-200 bg-zinc-50" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                    OTP code
+                  </Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="123456"
+                    className="h-11 rounded-lg border-zinc-200"
+                  />
+                </div>
+              </>
+            ) : null}
+
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-600">
                 New password
@@ -183,14 +216,14 @@ export function ResetPasswordClient() {
 
             <Button
               type="submit"
-              disabled={!token || !allMet || !match}
+              disabled={!hasResetIdentifier || !allMet || !match || (!usingToken && otp.length !== 6)}
               className="h-11 w-full rounded-lg bg-gold text-gold-foreground hover:bg-gold/90 font-semibold gap-2 disabled:opacity-50"
             >
               {loading ? "Updating…" : "Update password"}
               <span aria-hidden>→</span>
             </Button>
 
-            {allMet && match && token && (
+            {allMet && match && hasResetIdentifier && (usingToken || otp.length === 6) && (
               <div className="flex items-center gap-2 rounded-lg border border-gold bg-gold/10 px-3 py-2 text-sm font-medium text-gold">
                 <Check className="h-4 w-4 shrink-0" />
                 Security verified

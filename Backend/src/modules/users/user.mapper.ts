@@ -10,6 +10,7 @@ export function toApiUser(user: UserDocument): ApiUser {
   return {
     id: user.id,
     email: user.email,
+    emailVerified: user.emailVerified,
     name: user.name,
     role: toApiUserRole(user.role),
     enrolled: user.enrolled,

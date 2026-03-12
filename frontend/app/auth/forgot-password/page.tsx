@@ -57,7 +57,7 @@ export default function AuthForgotPasswordPage() {
             Reset your password
           </h1>
           <p className="mt-2 text-zinc-600">
-            Enter your email and we&apos;ll send you a link to reset your password.
+            Enter your email and we&apos;ll send you a reset link and OTP code.
           </p>
 
           {submitted ? (
@@ -65,11 +65,19 @@ export default function AuthForgotPasswordPage() {
               <p className="font-medium text-gold">Check your email</p>
               <p className="mt-1">
                 If an account exists for that address, we&apos;ve sent a password
-                reset link. The link will expire in 24 hours.
+                reset link and OTP code. The reset code expires shortly for security.
               </p>
+              {email ? (
+                <Link
+                  href={`/auth/reset-password?email=${encodeURIComponent(email)}`}
+                  className="mt-4 inline-block font-medium text-gold hover:underline"
+                >
+                  I have an OTP code
+                </Link>
+              ) : null}
               <Link
                 href="/auth/login"
-                className="mt-4 inline-block font-medium text-gold hover:underline"
+                className="mt-4 ml-4 inline-block font-medium text-gold hover:underline"
               >
                 Return to login
               </Link>

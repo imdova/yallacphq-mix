@@ -176,7 +176,7 @@ export function CheckoutView() {
     return () => {
       cancelled = true;
     };
-  }, [payment]);
+  }, [payment, paymobIntegrationType]);
 
   React.useEffect(() => {
     if (!directCourseId) {
@@ -728,7 +728,7 @@ export function CheckoutView() {
                 <>
                   {paymobRateLoading ? (
                     <p className="mt-1 text-right text-sm text-zinc-500">
-                      Loading today's CBE rate...
+                      Loading today&apos;s CBE rate...
                     </p>
                   ) : paymobAmount != null ? (
                     <>

@@ -49,6 +49,8 @@ export function LoginClient() {
   }, [router, searchParams, status, user?.role]);
 
   const loading = status === "loading" || redirecting;
+  const oauthError = searchParams.get("oauth_error");
+  const displayError = error ?? oauthError;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,9 +168,9 @@ export function LoginClient() {
               </Label>
             </div>
 
-            {error ? (
+            {displayError ? (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
+                {displayError}
               </p>
             ) : null}
 
@@ -195,8 +197,12 @@ export function LoginClient() {
               variant="outline"
               className="h-11 w-full rounded-lg border-zinc-200 bg-white font-medium text-zinc-800 hover:bg-zinc-50"
               onClick={() => {
-                // Wire to your Google OAuth endpoint when ready, e.g. window.location.href = '/api/auth/google';
-                window.location.href = "/api/auth/google";
+                const url = new URL("/api/auth/google", window.location.origin);
+                const next = searchParams.get("next");
+                if (next && next.startsWith("/")) {
+                  url.searchParams.set("next", next);
+                }
+                window.location.href = url.toString();
               }}
             >
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden>

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import axios from 'axios';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import type { StringValue } from 'ms';
@@ -19,6 +20,23 @@ export type RefreshPayload = {
   email: string;
   role: Role;
   type: 'refresh';
+};
+
+type GoogleStatePayload = {
+  type: 'google_state';
+  next: string;
+};
+
+type GoogleTokenResponse = {
+  access_token: string;
+};
+
+type GoogleUserInfo = {
+  sub: string;
+  email: string;
+  email_verified: boolean;
+  name?: string;
+  picture?: string;
 };
 
 @Injectable()
@@ -63,8 +81,23 @@ export class AuthService {
     return crypto.createHash('sha256').update(value).digest('hex');
   }
 
+  isGoogleConfigured(): boolean {
+    return Boolean(
+      this.config.get<string>('GOOGLE_CLIENT_ID')?.trim() &&
+        this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim(),
+    );
+  }
+
   private generateOtp(): string {
     return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+  }
+
+  private sanitizeNext(next?: string | null): string {
+    const trimmed = next?.trim();
+    if (!trimmed || !trimmed.startsWith('/') || trimmed.startsWith('//')) {
+      return '/dashboard';
+    }
+    return trimmed;
   }
 
   private createChallenge(ttlMinutes: number) {
@@ -94,6 +127,148 @@ export class AuthService {
       url.searchParams.set(key, value);
     }
     return url.toString();
+  }
+
+  private ensureGoogleConfigured() {
+    if (!this.isGoogleConfigured()) {
+      throw new BadRequestException(
+        'Google login is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
+      );
+    }
+  }
+
+  private getGoogleRedirectUri(): string {
+    return (
+      this.config.get<string>('GOOGLE_CALLBACK_URL')?.trim() ||
+      this.mail.getAppUrl('/api/auth/google/callback')
+    );
+  }
+
+  async buildGoogleAuthorizationUrl(next?: string): Promise<string> {
+    this.ensureGoogleConfigured();
+
+    const safeNext = this.sanitizeNext(next);
+    const state = await this.jwt.signAsync(
+      {
+        type: 'google_state',
+        next: safeNext,
+      } satisfies GoogleStatePayload,
+      { expiresIn: '10m' as StringValue },
+    );
+
+    const params = new URLSearchParams({
+      client_id: this.config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+      redirect_uri: this.getGoogleRedirectUri(),
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'online',
+      include_granted_scopes: 'true',
+      prompt: 'select_account',
+      state,
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  private async fetchGoogleUserInfo(code: string): Promise<GoogleUserInfo> {
+    this.ensureGoogleConfigured();
+
+    let accessToken: string;
+    try {
+      const tokenParams = new URLSearchParams({
+        code,
+        client_id: this.config.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+        client_secret: this.config.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
+        redirect_uri: this.getGoogleRedirectUri(),
+        grant_type: 'authorization_code',
+      });
+      const tokenRes = await axios.post<GoogleTokenResponse>(
+        'https://oauth2.googleapis.com/token',
+        tokenParams.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        },
+      );
+      accessToken = tokenRes.data.access_token;
+    } catch (error) {
+      this.logger.warn(
+        `Google token exchange failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      throw new BadRequestException('Google authentication failed');
+    }
+
+    try {
+      const userInfoRes = await axios.get<GoogleUserInfo>(
+        'https://openidconnect.googleapis.com/v1/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      return userInfoRes.data;
+    } catch (error) {
+      this.logger.warn(
+        `Google userinfo fetch failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      throw new BadRequestException('Google authentication failed');
+    }
+  }
+
+  private async findOrCreateGoogleUser(profile: GoogleUserInfo) {
+    if (!profile.email || profile.email_verified !== true) {
+      throw new BadRequestException(
+        'Google account must have a verified email address',
+      );
+    }
+
+    let user =
+      (await this.users.findByGoogleId(profile.sub)) ??
+      (await this.users.findByEmail(profile.email));
+
+    if (!user) {
+      const passwordHash = await bcrypt.hash(crypto.randomUUID(), 10);
+      return this.users.createStudent({
+        name: profile.name?.trim() || profile.email.split('@')[0] || 'Google User',
+        email: profile.email,
+        passwordHash,
+        emailVerified: true,
+        googleId: profile.sub,
+        profileImageUrl: profile.picture,
+      });
+    }
+
+    if (!user.emailVerified) {
+      user = (await this.users.markEmailVerified(user.id)) ?? user;
+    }
+
+    const patch: {
+      googleId?: string;
+      profileImageUrl?: string;
+      name?: string;
+    } = {};
+
+    if (!user.googleId) {
+      patch.googleId = profile.sub;
+    }
+    if (!user.profileImageUrl && profile.picture) {
+      patch.profileImageUrl = profile.picture;
+    }
+    if ((!user.name || user.name.trim() === '') && profile.name?.trim()) {
+      patch.name = profile.name.trim();
+    }
+
+    if (Object.keys(patch).length > 0) {
+      user = (await this.users.updateById(user.id, patch)) ?? user;
+    }
+
+    return user;
   }
 
   private async queueVerificationEmail(user: {
@@ -216,6 +391,38 @@ export class AuthService {
       accessToken,
       refreshToken,
       user,
+    };
+  }
+
+  async exchangeGoogleCode(params: { code: string; state: string }) {
+    this.ensureGoogleConfigured();
+
+    let statePayload: GoogleStatePayload;
+    try {
+      statePayload = await this.jwt.verifyAsync<GoogleStatePayload>(
+        params.state,
+        {
+          secret: this.config.getOrThrow<string>('JWT_SECRET'),
+        },
+      );
+    } catch {
+      throw new BadRequestException('Invalid or expired Google login state');
+    }
+
+    if (statePayload.type !== 'google_state') {
+      throw new BadRequestException('Invalid Google login state');
+    }
+
+    const profile = await this.fetchGoogleUserInfo(params.code);
+    const user = await this.findOrCreateGoogleUser(profile);
+    const accessToken = await this.signAccessToken(user);
+    const refreshToken = await this.signRefreshToken(user);
+
+    return {
+      accessToken,
+      refreshToken,
+      user,
+      next: this.sanitizeNext(statePayload.next),
     };
   }
 

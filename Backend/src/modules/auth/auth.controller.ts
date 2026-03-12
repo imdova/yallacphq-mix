@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -35,6 +36,8 @@ import {
   ChangePasswordResponseDto,
   ForgotPasswordBodyDto,
   ForgotPasswordResponseDto,
+  GoogleExchangeCodeBodyDto,
+  GoogleExchangeCodeResponseDto,
   LoginBodyDto,
   ResendVerificationBodyDto,
   ResendVerificationResponseDto,
@@ -54,6 +57,8 @@ import {
   changePasswordResponseSchema,
   forgotPasswordBodySchema,
   forgotPasswordResponseSchema,
+  googleExchangeCodeBodySchema,
+  googleExchangeCodeResponseSchema,
   loginBodySchema,
   resendVerificationBodySchema,
   resendVerificationResponseSchema,
@@ -65,6 +70,7 @@ import {
 } from '../../contracts';
 import type {
   ForgotPasswordBody,
+  GoogleExchangeCodeBody,
   LoginBody,
   ResendVerificationBody,
   ResetPasswordBody,
@@ -75,6 +81,28 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { toApiUser } from '../users/user.mapper';
 import { UsersService } from '../users/users.service';
+
+function setAuthCookies(
+  res: Response,
+  params: { accessToken: string; refreshToken: string; rememberMe?: boolean },
+) {
+  res.cookie('access_token', params.accessToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: params.rememberMe ? 1000 * 60 * 60 * 24 * 30 : undefined,
+    path: '/',
+  });
+  res.cookie('refresh_token', params.refreshToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: params.rememberMe
+      ? 1000 * 60 * 60 * 24 * 30
+      : 1000 * 60 * 60 * 24 * 7,
+  });
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -100,19 +128,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken, user } = await this.auth.registerStudent(body);
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    });
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
+    setAuthCookies(res, { accessToken, refreshToken });
     return { accessToken, user: toApiUser(user) };
   }
 
@@ -147,22 +163,47 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken, user } = await this.auth.login(body);
-    const rememberMe = Boolean(body.rememberMe);
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: rememberMe ? 1000 * 60 * 60 * 24 * 30 : undefined,
-      path: '/',
-    });
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: rememberMe ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 60 * 24 * 7,
+    setAuthCookies(res, {
+      accessToken,
+      refreshToken,
+      rememberMe: Boolean(body.rememberMe),
     });
     return { accessToken, user: toApiUser(user) };
+  }
+
+  @Get('google/start')
+  @Version('1')
+  @ApiOperation({
+    summary: 'Start Google login',
+    description: 'Redirect the browser to Google OAuth',
+  })
+  async googleStart(
+    @Query('next') next: string | undefined,
+    @Res() res: Response,
+  ) {
+    const url = await this.auth.buildGoogleAuthorizationUrl(next);
+    return res.redirect(url);
+  }
+
+  @Post('google/exchange-code')
+  @Version('1')
+  @ApiOperation({
+    summary: 'Exchange Google authorization code',
+    description: 'Finish Google login and issue app auth cookies/tokens',
+  })
+  @ApiBody({ type: GoogleExchangeCodeBodyDto })
+  @ApiCreatedResponse({ type: GoogleExchangeCodeResponseDto })
+  @ApiBadRequestResponse({ type: ApiErrorDto })
+  @UsePipes(new ZodValidationPipe(googleExchangeCodeBodySchema))
+  @ResponseSchema(googleExchangeCodeResponseSchema)
+  async googleExchangeCode(
+    @Body() body: GoogleExchangeCodeBody,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user, next } =
+      await this.auth.exchangeGoogleCode(body);
+    setAuthCookies(res, { accessToken, refreshToken });
+    return { accessToken, user: toApiUser(user), next };
   }
 
   @Post('logout')
@@ -195,19 +236,7 @@ export class AuthController {
     const refreshToken =
       (req.cookies as Record<string, string | undefined> | undefined)?.refresh_token ?? '';
     const { accessToken, refreshToken: newRefreshToken } = await this.auth.refresh(refreshToken);
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    });
-    res.cookie('refresh_token', newRefreshToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
+    setAuthCookies(res, { accessToken, refreshToken: newRefreshToken });
     return { accessToken };
   }
 

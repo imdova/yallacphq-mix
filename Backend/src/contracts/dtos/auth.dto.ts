@@ -35,6 +35,14 @@ export class LoginBodyDto {
   rememberMe?: boolean;
 }
 
+export class GoogleExchangeCodeBodyDto {
+  @ApiProperty({ example: '4/0AbCDefGhIjK' })
+  code!: string;
+
+  @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiJ9.google_state' })
+  state!: string;
+}
+
 export class AuthUserResponseDto {
   @ApiProperty({
     description: 'JWT access token (also set as httpOnly cookie)',
@@ -63,6 +71,14 @@ export class AuthRefreshResponseDto {
     description: 'New JWT access token (also set as httpOnly cookie)',
   })
   accessToken!: string;
+}
+
+export class GoogleExchangeCodeResponseDto extends AuthUserResponseDto {
+  @ApiProperty({
+    description: 'Safe relative path to redirect the user after Google login',
+    example: '/dashboard',
+  })
+  next!: string;
 }
 
 export class ForgotPasswordBodyDto {

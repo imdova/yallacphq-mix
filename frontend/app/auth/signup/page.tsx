@@ -270,6 +270,9 @@ export default function AuthSignupPage() {
                 type="button"
                 variant="outline"
                 className="h-11 rounded-lg border-zinc-200 gap-2"
+                onClick={() => {
+                  window.location.href = "/api/auth/google";
+                }}
               >
                 <span className="text-base font-bold">G</span>
                 Google

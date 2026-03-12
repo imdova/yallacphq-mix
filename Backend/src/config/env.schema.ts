@@ -37,6 +37,11 @@ export const envSchema = z.object({
   SMTP_TRANSPORT: z.string().optional(),
   SMTP_DEMO_EMAIL: z.string().email().optional(),
 
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
+
   // PayPal (optional – required only for server-side capture on checkout confirm)
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_SECRET: z.string().optional(),

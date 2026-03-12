@@ -18,6 +18,13 @@ export const loginBodySchema = z.object({
 
 export type LoginBody = z.infer<typeof loginBodySchema>;
 
+export const googleExchangeCodeBodySchema = z.object({
+  code: z.string().min(1),
+  state: z.string().min(1),
+});
+
+export type GoogleExchangeCodeBody = z.infer<typeof googleExchangeCodeBodySchema>;
+
 export const forgotPasswordBodySchema = z.object({
   email: z.string().email(),
 });
@@ -92,6 +99,14 @@ export const authRefreshResponseSchema = z.object({
 });
 
 export type AuthRefreshResponse = z.infer<typeof authRefreshResponseSchema>;
+
+export const googleExchangeCodeResponseSchema = authUserResponseSchema.extend({
+  next: z.string().min(1),
+});
+
+export type GoogleExchangeCodeResponse = z.infer<
+  typeof googleExchangeCodeResponseSchema
+>;
 
 export const forgotPasswordResponseSchema = z.object({
   success: z.literal(true),

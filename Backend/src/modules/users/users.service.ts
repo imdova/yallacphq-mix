@@ -20,12 +20,18 @@ export class UsersService {
     email: string;
     passwordHash: string;
     speciality?: string;
+    emailVerified?: boolean;
+    googleId?: string;
+    profileImageUrl?: string;
   }) {
     return this.userModel.create({
       name: params.name,
       email: params.email,
       passwordHash: params.passwordHash,
       role: Role.student,
+      emailVerified: params.emailVerified ?? false,
+      ...(params.googleId ? { googleId: params.googleId } : {}),
+      ...(params.profileImageUrl ? { profileImageUrl: params.profileImageUrl } : {}),
       ...(params.speciality != null && params.speciality.trim() !== '' && { speciality: params.speciality.trim() }),
     });
   }
@@ -45,6 +51,10 @@ export class UsersService {
 
   async findByEmail(email: string) {
     return this.userModel.findOne({ email: email.trim().toLowerCase() }).exec();
+  }
+
+  async findByGoogleId(googleId: string) {
+    return this.userModel.findOne({ googleId: googleId.trim() }).exec();
   }
 
   async findOne(filter: Partial<Pick<User, 'email' | 'role'>>) {

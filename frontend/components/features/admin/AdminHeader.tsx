@@ -10,6 +10,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Menu,
   Plus,
   Search,
   Settings,
@@ -46,7 +47,7 @@ const titleMap: Record<string, { title: string; subtitle?: string }> = {
   "/admin/settings": { title: "LMS Setting", subtitle: "Security, integrations, preferences" },
 };
 
-export function AdminHeader() {
+export function AdminHeader({ onOpenNav }: { onOpenNav?: () => void }) {
   const pathname = usePathname() ?? "/admin";
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -125,22 +126,35 @@ export function AdminHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur">
       <div className="flex h-14 items-center justify-between gap-4 px-4 md:px-6">
-        <div className="min-w-0">
-          {pathname === "/admin/courses/new" ? (
-            <Button asChild variant="outline" size="sm" className="h-9 rounded-xl border-zinc-200">
-              <Link href="/admin/courses">
-                <ArrowLeft className="h-4 w-4" />
-                Back to courses
-              </Link>
-            </Button>
-          ) : (
-            <>
-              <div className="truncate text-sm font-semibold text-zinc-900">{meta.title}</div>
-              {meta.subtitle ? (
-                <div className="truncate text-xs text-zinc-500">{meta.subtitle}</div>
-              ) : null}
-            </>
-          )}
+        <div className="min-w-0 flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 rounded-xl border-zinc-200 lg:hidden"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+
+          <div className="min-w-0">
+            {pathname === "/admin/courses/new" ? (
+              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl border-zinc-200">
+                <Link href="/admin/courses">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to courses
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <div className="truncate text-sm font-semibold text-zinc-900">{meta.title}</div>
+                {meta.subtitle ? (
+                  <div className="truncate text-xs text-zinc-500">{meta.subtitle}</div>
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="hidden max-w-md flex-1 lg:block" ref={searchRef}>

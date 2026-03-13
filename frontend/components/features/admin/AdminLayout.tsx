@@ -1,14 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AdminSidebar } from "@/components/features/admin/AdminSidebar";
 import { AdminHeader } from "@/components/features/admin/AdminHeader";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/auth-context";
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const router = useRouter();
   const { user, status } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (status !== "authenticated" || !user) return;
@@ -39,11 +42,30 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  React.useEffect(() => {
+    // Close mobile nav on route change inside /admin
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50">
-      <AdminSidebar />
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex">
+        <AdminSidebar />
+      </div>
+
+      {/* Mobile sidebar drawer */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent
+          side="left"
+          className="w-[280px] border-zinc-800 bg-zinc-950 p-0 text-zinc-50"
+        >
+          <AdminSidebar />
+        </SheetContent>
+      </Sheet>
+
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminHeader />
+        <AdminHeader onOpenNav={() => setMobileNavOpen(true)} />
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

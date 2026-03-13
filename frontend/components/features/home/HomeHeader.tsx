@@ -15,6 +15,8 @@ import { Menu, ChevronDown, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OFFERS_DROPDOWN_ITEMS, WEBINARS_DROPDOWN_ITEMS } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
+import { StudentAccountMenu } from "@/components/features/dashboard/StudentAccountMenu";
+import { AdminAccountMenu } from "@/components/features/admin/AdminAccountMenu";
 
 const navLinks = [
   { href: "/courses", label: "Courses" },
@@ -112,33 +114,10 @@ export function HomeHeader() {
               {label}
             </Link>
           ))}
-          {isLoggedIn && (
-            <>
-              <Link
-                href="/dashboard/profile"
-                className={cn(
-                  "text-sm font-medium uppercase tracking-wide text-white/90",
-                  "inline-flex items-center gap-1.5 transition-colors hover:text-white"
-                )}
-              >
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className={cn(
-                  "text-sm font-medium uppercase tracking-wide text-white/90",
-                  "inline-flex items-center gap-1.5 transition-colors hover:text-white"
-                )}
-              >
-                <LogOut className="h-4 w-4" />
-                Log out
-              </button>
-            </>
-          )}
         </nav>
         <div className="flex items-center gap-2">
+          {isLoggedIn && user?.role === "admin" && <AdminAccountMenu variant="dark" className="border-white/20" />}
+          {isLoggedIn && user?.role !== "admin" && <StudentAccountMenu variant="dark" />}
           {!isLoggedIn && (
             <div className="hidden items-center gap-4 md:flex">
               <Link
@@ -210,7 +189,41 @@ export function HomeHeader() {
                     {label}
                   </Link>
                 ))}
-                {isLoggedIn && (
+                {isLoggedIn && user?.role === "admin" && (
+                  <>
+                    <Link
+                      href="/admin"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/admin/settings"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                    >
+                      <User className="h-5 w-5" />
+                      Profile
+                    </Link>
+                    <Link
+                      href="/admin/settings"
+                      onClick={() => setOpen(false)}
+                      className="inline-flex items-center gap-2 text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                    >
+                      LMS Setting
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void handleLogout()}
+                      className="inline-flex items-center gap-2 text-left text-lg font-medium uppercase tracking-wide text-white hover:text-gold"
+                    >
+                      <LogOut className="h-5 w-5" />
+                      Log out
+                    </button>
+                  </>
+                )}
+                {isLoggedIn && user?.role !== "admin" && (
                   <>
                     <Link
                       href="/dashboard/profile"

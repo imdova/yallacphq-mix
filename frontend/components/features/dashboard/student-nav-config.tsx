@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   BookOpen,
+  Library,
   HelpCircle,
   Award,
   User,
@@ -23,9 +24,10 @@ export const STUDENT_NAV_ITEMS: StudentNavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/courses", label: "My Courses", icon: BookOpen },
+  { href: "/courses", label: "Browse Courses", icon: Library },
+  { href: "/dashboard/certifications", label: "My Certificates", icon: Award },
   { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
   { href: "/dashboard/quizzes", label: "Practice Quizzes", icon: HelpCircle },
-  { href: "/dashboard/certifications", label: "Certifications", icon: Award },
   { href: "/dashboard/community", label: "Community", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

@@ -5,11 +5,13 @@ import {
   LayoutDashboard,
   Users,
   GraduationCap,
+  FileQuestion,
   ShoppingBag,
   Building2,
   Tag,
   Ticket,
   Video,
+  Globe,
   Settings,
 } from "lucide-react";
 
@@ -24,10 +26,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/students", label: "Students", icon: Users },
   { href: "/admin/courses", label: "Courses", icon: GraduationCap },
+  { href: "/admin/quizzes", label: "Quizzes", icon: FileQuestion },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/bank-transfers", label: "Bank Transfers", icon: Building2 },
   { href: "/admin/promo-codes", label: "Promo codes", icon: Ticket },
   { href: "/admin/offers", label: "Offers", icon: Tag },
   { href: "/admin/webinars", label: "Webinars", icon: Video },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/admin/site-settings", label: "Site settings", icon: Globe },
+  { href: "/admin/settings", label: "LMS Setting", icon: Settings },
 ];

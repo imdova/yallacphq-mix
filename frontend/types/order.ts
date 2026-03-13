@@ -7,6 +7,7 @@ export interface Order {
   studentName: string;
   studentEmail: string;
   studentPhone?: string;
+  studentCountry?: string;
   courseTitle: string;
   currency: string;
   amount: number;

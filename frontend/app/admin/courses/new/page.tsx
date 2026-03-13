@@ -14,6 +14,13 @@ import { getStudentFieldOptions } from "@/lib/dal/settings";
 import { uploadCourseImage } from "@/lib/dal/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FormField, FormInput, FormSelect } from "@/components/shared/forms";
 import { cn } from "@/lib/utils";
 import {
@@ -78,6 +85,17 @@ const CERTIFICATION_OPTIONS = [
   { value: "Micro-Credential", label: "Micro-Credential" },
 ] as const;
 
+const READY_MADE_QUIZZES = [
+  "Module Quiz",
+  "Knowledge Check",
+  "Practice Quiz",
+  "CPHQ Practice Quiz",
+  "Assessment",
+  "Final Quiz",
+  "Section Review",
+  "Self-Assessment",
+];
+
 function nextId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -91,6 +109,8 @@ export interface CurriculumLecture {
   materialFileName?: string;
   materialDataUrl?: string;
   freeLecture: boolean;
+  description?: string;
+  thumbnailName?: string;
 }
 
 export interface CurriculumQuiz {
@@ -264,11 +284,38 @@ export default function AdminCourseNewPage() {
   const [curriculumSections, setCurriculumSections] = React.useState<CurriculumSection[]>([]);
   const [expandedSectionId, setExpandedSectionId] = React.useState<string | null>(null);
   const [expandedLectureIds, setExpandedLectureIds] = React.useState<Set<string>>(new Set());
-  const [materialUploadForLectureId, setMaterialUploadForLectureId] = React.useState<string | null>(null);
+  const [expandedQuizIds, setExpandedQuizIds] = React.useState<Set<string>>(new Set());
+  const [materialUploadForLectureId, setMaterialUploadForLectureId] = React.useState<string | null>(
+    null
+  );
   const [seoKeywordInput, setSeoKeywordInput] = React.useState("");
   const [availableCourses, setAvailableCourses] = React.useState<Course[]>([]);
   const [selectedRelatedCourseIds, setSelectedRelatedCourseIds] = React.useState<string[]>([]);
   const [reviewMediaItems, setReviewMediaItems] = React.useState<ReviewMediaFormItem[]>([]);
+  const [curriculumQuery, setCurriculumQuery] = React.useState("");
+  const [newSectionTitle, setNewSectionTitle] = React.useState("");
+  const [builderTab, setBuilderTab] = React.useState<"lesson" | "quiz" | "material">("lesson");
+  const [previewMode, setPreviewMode] = React.useState(true);
+
+  const [draftLessonTitle, setDraftLessonTitle] = React.useState("");
+  const [draftLessonVideoUrl, setDraftLessonVideoUrl] = React.useState("");
+  const [draftLessonDescription, setDraftLessonDescription] = React.useState("");
+  const [draftLessonThumbName, setDraftLessonThumbName] = React.useState("");
+  const lessonThumbRef = React.useRef<HTMLInputElement | null>(null);
+  const [addLessonOpen, setAddLessonOpen] = React.useState(false);
+  const [addLessonSectionId, setAddLessonSectionId] = React.useState<string | null>(null);
+  const [addQuizSectionId, setAddQuizSectionId] = React.useState<string | null>(null);
+
+  const [draftQuizTitle, setDraftQuizTitle] = React.useState("");
+  const [materialLectureId, setMaterialLectureId] = React.useState<string>("");
+  const [materialUrlDraft, setMaterialUrlDraft] = React.useState("");
+  const [draggingCurriculumItemId, setDraggingCurriculumItemId] = React.useState<string | null>(
+    null
+  );
+  const [dragOverCurriculumItemId, setDragOverCurriculumItemId] = React.useState<string | null>(
+    null
+  );
+  const [quizEditSearch, setQuizEditSearch] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     getStudentFieldOptions()
@@ -281,6 +328,49 @@ export default function AdminCourseNewPage() {
       .then((items) => setAvailableCourses(items))
       .catch(() => setAvailableCourses([]));
   }, []);
+
+  React.useEffect(() => {
+    if (!expandedSectionId && curriculumSections.length > 0) {
+      setExpandedSectionId(curriculumSections[0].id);
+    }
+  }, [expandedSectionId, curriculumSections]);
+
+  React.useEffect(() => {
+    setPreviewMode(true);
+    setBuilderTab("lesson");
+    setCurriculumQuery("");
+    setDraftLessonTitle("");
+    setDraftLessonVideoUrl("");
+    setDraftLessonDescription("");
+    setDraftLessonThumbName("");
+    setDraftQuizTitle("");
+    setMaterialUrlDraft("");
+  }, [expandedSectionId]);
+
+  React.useEffect(() => {
+    const activeId = expandedSectionId ?? curriculumSections[0]?.id ?? "";
+    const section = curriculumSections.find((s) => s.id === activeId);
+    const lectureIds = (section?.items ?? [])
+      .filter((i): i is CurriculumLecture => i.type === "lecture")
+      .map((l) => l.id);
+
+    if (lectureIds.length === 0) {
+      if (materialLectureId) setMaterialLectureId("");
+      return;
+    }
+    if (!materialLectureId || !lectureIds.includes(materialLectureId)) {
+      setMaterialLectureId(lectureIds[0]);
+    }
+  }, [expandedSectionId, curriculumSections, materialLectureId]);
+
+  React.useEffect(() => {
+    const activeId = expandedSectionId ?? curriculumSections[0]?.id ?? "";
+    const section = curriculumSections.find((s) => s.id === activeId);
+    const lecture = (section?.items ?? []).find(
+      (i): i is CurriculumLecture => i.type === "lecture" && i.id === materialLectureId
+    );
+    if (lecture) setMaterialUrlDraft(lecture.materialUrl ?? "");
+  }, [expandedSectionId, curriculumSections, materialLectureId]);
 
   const STEPS = [
     { id: 1, label: "Course details" },
@@ -328,9 +418,77 @@ export default function AdminCourseNewPage() {
     },
     mode: "onSubmit",
   });
-  const isFreeCourse = (methods.watch("priceRegular") ?? 0) === 0 && (methods.watch("priceSale") ?? 0) === 0;
+  const isFreeCourse =
+    (methods.watch("priceRegular") ?? 0) === 0 && (methods.watch("priceSale") ?? 0) === 0;
   const instructorImageUrl = methods.watch("instructorImageUrl") ?? "";
   const currentTag = methods.watch("tag");
+  const activeSection = React.useMemo(() => {
+    const id = expandedSectionId ?? curriculumSections[0]?.id ?? null;
+    if (!id) return null;
+    return curriculumSections.find((s) => s.id === id) ?? null;
+  }, [expandedSectionId, curriculumSections]);
+
+  const activeSectionIndex = React.useMemo(() => {
+    if (!activeSection) return -1;
+    return curriculumSections.findIndex((s) => s.id === activeSection.id);
+  }, [activeSection, curriculumSections]);
+
+  const curriculumQueryNormalized = curriculumQuery.trim().toLowerCase();
+  const activeSectionItems = activeSection?.items ?? [];
+  const filteredActiveItems = curriculumQueryNormalized
+    ? activeSectionItems.filter((item) =>
+        String(item.title ?? "")
+          .toLowerCase()
+          .includes(curriculumQueryNormalized)
+      )
+    : activeSectionItems;
+  const activeLessonsCount = activeSectionItems.filter((i) => i.type === "lecture").length;
+  const activeQuizzesCount = activeSectionItems.filter((i) => i.type === "quiz").length;
+  const activeSectionDisplayTitle = activeSection
+    ? /^\s*module\s*\d+/i.test(activeSection.title)
+      ? activeSection.title
+      : `Module ${Math.max(1, activeSectionIndex + 1)}: ${activeSection.title}`
+    : "";
+  const addLessonSectionInfo = React.useMemo(() => {
+    if (!addLessonSectionId) return null;
+    const index = curriculumSections.findIndex((s) => s.id === addLessonSectionId);
+    const section = curriculumSections.find((s) => s.id === addLessonSectionId) ?? null;
+    if (!section) return null;
+    return { section, index };
+  }, [addLessonSectionId, curriculumSections]);
+  const addLessonModuleLabel = addLessonSectionInfo
+    ? (() => {
+        const raw = addLessonSectionInfo.section.title.trim();
+        const cleaned = raw.replace(/^\s*module\s*\d+\s*:\s*/i, "").trim() || raw;
+        const number = Math.max(1, addLessonSectionInfo.index + 1);
+        return `Module ${number}: ${cleaned}`.toUpperCase();
+      })()
+    : "";
+  const canSaveLesson = Boolean(addLessonSectionId && draftLessonTitle.trim().length > 0);
+
+  const addQuizSectionInfo = React.useMemo(() => {
+    if (!addQuizSectionId) return null;
+    const index = curriculumSections.findIndex((s) => s.id === addQuizSectionId);
+    const section = curriculumSections.find((s) => s.id === addQuizSectionId) ?? null;
+    if (!section) return null;
+    return { section, index };
+  }, [addQuizSectionId, curriculumSections]);
+  const addQuizModuleLabel = addQuizSectionInfo
+    ? (() => {
+        const raw = addQuizSectionInfo.section.title.trim();
+        const cleaned = raw.replace(/^\s*module\s*\d+\s*:\s*/i, "").trim() || raw;
+        const number = Math.max(1, addQuizSectionInfo.index + 1);
+        return `Module ${number}: ${cleaned}`.toUpperCase();
+      })()
+    : "";
+
+  const openAddQuizModal = (sectionId: string) => {
+    setAddQuizSectionId(sectionId);
+  };
+
+  const closeAddQuizModal = () => {
+    setAddQuizSectionId(null);
+  };
   React.useEffect(() => {
     if (categoryOptions.length > 0 && currentTag && !categoryOptions.includes(currentTag)) {
       methods.setValue("tag", categoryOptions[0], { shouldValidate: false });
@@ -431,45 +589,72 @@ export default function AdminCourseNewPage() {
     }
   };
 
-  const addSection = () => {
+  const addSection = (title?: string) => {
     const id = nextId();
-    setCurriculumSections((prev) => [...prev, { id, title: "New section", description: "", items: [] }]);
+    const safeTitle = title?.trim() ? title.trim() : "New section";
+    setCurriculumSections((prev) => [
+      ...prev,
+      { id, title: safeTitle, description: "", items: [] },
+    ]);
     setExpandedSectionId(id);
+    return id;
   };
 
-  const addLecture = (sectionId: string) => {
+  const addLecture = (
+    sectionId: string,
+    updates?: Partial<Omit<CurriculumLecture, "id" | "type">>
+  ) => {
     const section = curriculumSections.find((s) => s.id === sectionId);
     if (!section) return;
     const lectureCount = section.items.filter((i) => i.type === "lecture").length + 1;
     const newLecture: CurriculumLecture = {
       id: nextId(),
       type: "lecture",
-      title: `Lecture ${lectureCount}`,
-      videoUrl: "",
-      materialUrl: "",
-      freeLecture: false,
+      title: updates?.title?.trim() ? updates.title.trim() : `Lesson ${lectureCount}`,
+      videoUrl: updates?.videoUrl ?? "",
+      materialUrl: updates?.materialUrl ?? "",
+      materialFileName: updates?.materialFileName,
+      materialDataUrl: updates?.materialDataUrl,
+      freeLecture: updates?.freeLecture ?? false,
+      description: updates?.description?.trim() ? updates.description.trim() : "",
+      thumbnailName: updates?.thumbnailName?.trim() ? updates.thumbnailName.trim() : undefined,
     };
     setCurriculumSections((prev) =>
       prev.map((s) => (s.id === sectionId ? { ...s, items: [...s.items, newLecture] } : s))
     );
     setExpandedLectureIds((prev) => new Set([...prev, newLecture.id]));
+    return newLecture.id;
   };
 
-  const addQuiz = (sectionId: string) => {
+  const addQuiz = (sectionId: string, updates?: Partial<Pick<CurriculumQuiz, "title">>) => {
     const section = curriculumSections.find((s) => s.id === sectionId);
     if (!section) return;
     const quizCount = section.items.filter((i) => i.type === "quiz").length + 1;
-    const newQuiz: CurriculumQuiz = { id: nextId(), type: "quiz", title: `Quiz ${quizCount}` };
+    const newQuiz: CurriculumQuiz = {
+      id: nextId(),
+      type: "quiz",
+      title: updates?.title?.trim() ? updates.title.trim() : `Quiz ${quizCount}`,
+    };
     setCurriculumSections((prev) =>
       prev.map((s) => (s.id === sectionId ? { ...s, items: [...s.items, newQuiz] } : s))
     );
+    return newQuiz.id;
   };
 
-  const updateSection = (sectionId: string, updates: Partial<Pick<CurriculumSection, "title" | "description">>) => {
-    setCurriculumSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, ...updates } : s)));
+  const updateSection = (
+    sectionId: string,
+    updates: Partial<Pick<CurriculumSection, "title" | "description">>
+  ) => {
+    setCurriculumSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, ...updates } : s))
+    );
   };
 
-  const updateLecture = (sectionId: string, lectureId: string, updates: Partial<Omit<CurriculumLecture, "id" | "type">>) => {
+  const updateLecture = (
+    sectionId: string,
+    lectureId: string,
+    updates: Partial<Omit<CurriculumLecture, "id" | "type">>
+  ) => {
     setCurriculumSections((prev) =>
       prev.map((s) =>
         s.id === sectionId
@@ -484,11 +669,20 @@ export default function AdminCourseNewPage() {
     );
   };
 
-  const updateQuiz = (sectionId: string, quizId: string, updates: Partial<Pick<CurriculumQuiz, "title">>) => {
+  const updateQuiz = (
+    sectionId: string,
+    quizId: string,
+    updates: Partial<Pick<CurriculumQuiz, "title">>
+  ) => {
     setCurriculumSections((prev) =>
       prev.map((s) =>
         s.id === sectionId
-          ? { ...s, items: s.items.map((i) => (i.type === "quiz" && i.id === quizId ? { ...i, ...updates } : i)) }
+          ? {
+              ...s,
+              items: s.items.map((i) =>
+                i.type === "quiz" && i.id === quizId ? { ...i, ...updates } : i
+              ),
+            }
           : s
       )
     );
@@ -501,9 +695,16 @@ export default function AdminCourseNewPage() {
 
   const removeItem = (sectionId: string, itemId: string) => {
     setCurriculumSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, items: s.items.filter((i) => i.id !== itemId) } : s))
+      prev.map((s) =>
+        s.id === sectionId ? { ...s, items: s.items.filter((i) => i.id !== itemId) } : s
+      )
     );
     setExpandedLectureIds((prev) => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      return next;
+    });
+    setExpandedQuizIds((prev) => {
       const next = new Set(prev);
       next.delete(itemId);
       return next;
@@ -511,7 +712,42 @@ export default function AdminCourseNewPage() {
   };
 
   const toggleSectionExpanded = (sectionId: string) => {
-    setExpandedSectionId((prev) => (prev === sectionId ? null : sectionId));
+    setExpandedSectionId(sectionId);
+  };
+
+  const reorderSectionItem = (sectionId: string, activeId: string, overId: string) => {
+    if (activeId === overId) return;
+    setCurriculumSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const items = [...s.items];
+        const fromIndex = items.findIndex((i) => i.id === activeId);
+        const toIndex = items.findIndex((i) => i.id === overId);
+        if (fromIndex === -1 || toIndex === -1) return s;
+        const [moved] = items.splice(fromIndex, 1);
+        items.splice(toIndex, 0, moved);
+        return { ...s, items };
+      })
+    );
+  };
+
+  const resetAddLessonDraft = () => {
+    setDraftLessonTitle("");
+    setDraftLessonVideoUrl("");
+    setDraftLessonDescription("");
+    setDraftLessonThumbName("");
+  };
+
+  const openAddLessonModal = (sectionId: string) => {
+    setAddLessonSectionId(sectionId);
+    resetAddLessonDraft();
+    setAddLessonOpen(true);
+  };
+
+  const closeAddLessonModal = () => {
+    setAddLessonOpen(false);
+    setAddLessonSectionId(null);
+    resetAddLessonDraft();
   };
 
   const toggleLectureExpanded = (lectureId: string) => {
@@ -519,6 +755,15 @@ export default function AdminCourseNewPage() {
       const next = new Set(prev);
       if (next.has(lectureId)) next.delete(lectureId);
       else next.add(lectureId);
+      return next;
+    });
+  };
+
+  const toggleQuizExpanded = (quizId: string) => {
+    setExpandedQuizIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(quizId)) next.delete(quizId);
+      else next.add(quizId);
       return next;
     });
   };
@@ -541,7 +786,12 @@ export default function AdminCourseNewPage() {
           ...s,
           items: s.items.map((i) =>
             i.type === "lecture" && i.id === lectureId
-              ? { ...i, materialFileName: file.name, materialDataUrl: String(reader.result ?? ""), materialUrl: "" }
+              ? {
+                  ...i,
+                  materialFileName: file.name,
+                  materialDataUrl: String(reader.result ?? ""),
+                  materialUrl: "",
+                }
               : i
           ),
         }))
@@ -625,7 +875,7 @@ export default function AdminCourseNewPage() {
       curriculumSections: curriculumPayload.length ? curriculumPayload : undefined,
       reviewMedia: reviewMediaPayload.length ? reviewMediaPayload : undefined,
       featured: data.featured ?? false,
-      featuredOrder: data.featured ? data.featuredOrder ?? 0 : undefined,
+      featuredOrder: data.featured ? (data.featuredOrder ?? 0) : undefined,
       relatedCourseIds: relatedCourseIds.length ? relatedCourseIds : undefined,
     };
     if (editId) {
@@ -650,1399 +900,2329 @@ export default function AdminCourseNewPage() {
           </div>
         )}
         {loadingEdit && (
-          <div className="flex items-center justify-center py-12 text-zinc-600">Loading course…</div>
+          <div className="flex items-center justify-center py-12 text-zinc-600">
+            Loading course…
+          </div>
         )}
         {!loadingEdit && !loadError && (
-        <div className="grid gap-6 xl:grid-cols-[1fr_360px] xl:gap-10">
-        <form onSubmit={submit} className="min-w-0 space-y-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="outline" size="sm" className="rounded-xl border-zinc-200">
-                <Link href={editId ? `/admin/courses/${editId}` : "/admin/courses"}>
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold tracking-tight text-zinc-900">
-                  {editId ? "Edit course" : "Add new course"}
-                </h1>
-                <p className="text-sm text-zinc-600">
-                  {editId ? "Update course details and publishing." : "Modern admin form with cover + publishing."}
-                </p>
+          <div
+            className={cn(
+              "grid gap-6 xl:gap-10",
+              step === 2 ? "xl:grid-cols-[360px_1fr]" : "xl:grid-cols-[1fr_360px]"
+            )}
+          >
+            <form
+              onSubmit={submit}
+              className={cn("w-full min-w-0 space-y-6", step === 2 ? "xl:order-2" : "xl:order-1")}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex flex-1 gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+                  {STEPS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setStep(s.id)}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                        step === s.id
+                          ? "bg-white text-zinc-900 shadow-sm"
+                          : "text-zinc-600 hover:text-zinc-900"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
+                          step === s.id
+                            ? "bg-gold text-gold-foreground"
+                            : "bg-zinc-200 text-zinc-600"
+                        )}
+                      >
+                        {s.id}
+                      </span>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="submit"
-                className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
-              >
-                <Check className="h-4 w-4" />
-                {editId ? "Save changes" : "Create course"}
-              </Button>
-            </div>
-          </div>
 
-          <div className="flex gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
-            {STEPS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setStep(s.id)}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-                  step === s.id
-                    ? "bg-white text-zinc-900 shadow-sm"
-                    : "text-zinc-600 hover:text-zinc-900"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
-                    step === s.id ? "bg-gold text-gold-foreground" : "bg-zinc-200 text-zinc-600"
-                  )}
-                >
-                  {s.id}
-                </span>
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          {step === 1 && (
-            <>
-              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Course details</CardTitle>
-                  <CardDescription>
-                    Course basics, duration, instructor, and how it will appear.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 pt-0">
-                  <FormField name="title" label="Course title" required>
-                    {({ id, error, ...rest }) => (
-                      <FormInput
-                        id={id}
-                        error={error}
-                        placeholder="e.g. CPHQ Comprehensive Review 2026"
-                        className="rounded-xl border-zinc-200"
-                        {...rest}
-                      />
-                    )}
-                  </FormField>
-
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <FormSelect
-                      name="tag"
-                      label="Category"
-                      required
-                      options={categoryOptions.map((c) => ({ value: c, label: c }))}
-                      placeholder={categoryOptions.length === 0 ? "Add categories in Settings" : "Select category"}
-                    />
-                    <FormSelect
-                      name="status"
-                      label="Status"
-                      options={STATUS_OPTIONS as unknown as { value: string; label: string }[]}
-                      placeholder="Select status"
-                    />
-                    <FormSelect
-                      name="level"
-                      label="Level"
-                      options={LEVEL_OPTIONS as unknown as { value: string; label: string }[]}
-                      placeholder="Select level"
-                    />
-                  </div>
-
+              {step === 1 && (
+                <>
                   <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Availability</CardTitle>
+                      <CardTitle className="text-base">Course details</CardTitle>
+                      <CardDescription>
+                        Course basics, duration, instructor, and how it will appear.
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-0">
-                      <FormField name="availability" label="Availability">
-                        {({ id }) => (
-                          <div
-                            className="flex flex-wrap gap-4"
-                            role="radiogroup"
-                            aria-labelledby={id}
-                          >
-                            {AVAILABILITY_OPTIONS.map((opt) => (
-                              <label
-                                key={opt.value}
-                                className="flex cursor-pointer items-center gap-2"
-                              >
-                                <input
-                                  type="radio"
-                                  name={id}
-                                  value={opt.value}
-                                  checked={methods.watch("availability") === opt.value}
-                                  onChange={() =>
-                                    methods.setValue(
-                                      "availability",
-                                      opt.value as FormValues["availability"]
-                                    )
-                                  }
-                                  className="h-4 w-4 border-zinc-300 text-zinc-600 focus:ring-zinc-400"
-                                />
-                                <span className="text-sm font-medium text-zinc-700">
-                                  {opt.label}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
+                    <CardContent className="grid gap-4 pt-0">
+                      <FormField name="title" label="Course title" required>
+                        {({ id, error, ...rest }) => (
+                          <FormInput
+                            id={id}
+                            error={error}
+                            placeholder="e.g. CPHQ Comprehensive Review 2026"
+                            className="rounded-xl border-zinc-200"
+                            {...rest}
+                          />
                         )}
                       </FormField>
 
-                      <div className="space-y-4">
-                        <FormField name="enablePromoCode">
-                          {({ id }) => (
-                            <label className="flex cursor-pointer items-center gap-2">
-                              <Checkbox
-                                id={id}
-                                checked={methods.watch("enablePromoCode") ?? false}
-                                onCheckedChange={(checked) =>
-                                  methods.setValue("enablePromoCode", !!checked)
-                                }
-                              />
-                              <span className="text-sm font-medium text-zinc-700">
-                                Enable promo code
-                              </span>
-                            </label>
-                          )}
-                        </FormField>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <FormSelect
+                          name="tag"
+                          label="Category"
+                          required
+                          options={categoryOptions.map((c) => ({ value: c, label: c }))}
+                          placeholder={
+                            categoryOptions.length === 0
+                              ? "Add categories in Settings"
+                              : "Select category"
+                          }
+                        />
+                        <FormSelect
+                          name="status"
+                          label="Status"
+                          options={STATUS_OPTIONS as unknown as { value: string; label: string }[]}
+                          placeholder="Select status"
+                        />
+                        <FormSelect
+                          name="level"
+                          label="Level"
+                          options={LEVEL_OPTIONS as unknown as { value: string; label: string }[]}
+                          placeholder="Select level"
+                        />
+                      </div>
 
-                        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-                          <div>
-                            <p className="text-sm font-semibold text-zinc-900">Free course</p>
+                      <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Availability</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-0">
+                          <FormField name="availability" label="Availability">
+                            {({ id }) => (
+                              <div
+                                className="flex flex-wrap gap-4"
+                                role="radiogroup"
+                                aria-labelledby={id}
+                              >
+                                {AVAILABILITY_OPTIONS.map((opt) => (
+                                  <label
+                                    key={opt.value}
+                                    className="flex cursor-pointer items-center gap-2"
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={id}
+                                      value={opt.value}
+                                      checked={methods.watch("availability") === opt.value}
+                                      onChange={() =>
+                                        methods.setValue(
+                                          "availability",
+                                          opt.value as FormValues["availability"]
+                                        )
+                                      }
+                                      className="h-4 w-4 border-zinc-300 text-zinc-600 focus:ring-zinc-400"
+                                    />
+                                    <span className="text-sm font-medium text-zinc-700">
+                                      {opt.label}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </FormField>
+
+                          <div className="space-y-4">
+                            <FormField name="enablePromoCode">
+                              {({ id }) => (
+                                <label className="flex cursor-pointer items-center gap-2">
+                                  <Checkbox
+                                    id={id}
+                                    checked={methods.watch("enablePromoCode") ?? false}
+                                    onCheckedChange={(checked) =>
+                                      methods.setValue("enablePromoCode", !!checked)
+                                    }
+                                  />
+                                  <span className="text-sm font-medium text-zinc-700">
+                                    Enable promo code
+                                  </span>
+                                </label>
+                              )}
+                            </FormField>
+
+                            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
+                              <div>
+                                <p className="text-sm font-semibold text-zinc-900">Free course</p>
+                                <p className="text-xs text-zinc-500">
+                                  No payment required; students can enroll for free.
+                                </p>
+                              </div>
+                              <Switch
+                                checked={isFreeCourse}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    methods.setValue("priceRegular", 0, { shouldDirty: true });
+                                    methods.setValue("priceSale", undefined, { shouldDirty: true });
+                                    methods.setValue("discountPercent", 0, { shouldDirty: true });
+                                  } else {
+                                    methods.setValue("priceRegular", 99, { shouldDirty: true });
+                                    methods.setValue("priceSale", undefined, { shouldDirty: true });
+                                    methods.setValue("discountPercent", 0, { shouldDirty: true });
+                                  }
+                                }}
+                                className="data-[state=checked]:bg-emerald-500"
+                              />
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <FormField name="priceRegular" label="Original Price">
+                                {({ id, error, ...rest }) => (
+                                  <div className="space-y-1.5">
+                                    <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
+                                      <select
+                                        value={methods.watch("currency") ?? "USD"}
+                                        onChange={(e) =>
+                                          methods.setValue("currency", e.target.value)
+                                        }
+                                        disabled={isFreeCourse}
+                                        className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
+                                      >
+                                        {CURRENCY_OPTIONS.map((c) => (
+                                          <option key={c.value} value={c.value}>
+                                            {c.value}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <FormInput
+                                        id={id}
+                                        error={error}
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
+                                        disabled={isFreeCourse}
+                                        {...rest}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </FormField>
+                              <FormField name="priceSale" label="Sale Price">
+                                {({ id, error, ...rest }) => (
+                                  <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
+                                    <select
+                                      value={methods.watch("currency") ?? "USD"}
+                                      onChange={(e) => methods.setValue("currency", e.target.value)}
+                                      disabled={isFreeCourse}
+                                      className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
+                                    >
+                                      {CURRENCY_OPTIONS.map((c) => (
+                                        <option key={c.value} value={c.value}>
+                                          {c.value}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <FormInput
+                                      id={id}
+                                      error={error}
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
+                                      {...rest}
+                                      onBlur={(e) => {
+                                        const maybeOnBlur = (
+                                          rest as {
+                                            onBlur?: (
+                                              ev: React.FocusEvent<HTMLInputElement>
+                                            ) => void;
+                                          }
+                                        ).onBlur;
+                                        maybeOnBlur?.(e);
+                                        syncDiscountFromSale();
+                                      }}
+                                      disabled={isFreeCourse}
+                                    />
+                                  </div>
+                                )}
+                              </FormField>
+                              <FormField name="discountPercent" label="Discount %">
+                                {({ id, error, ...rest }) => (
+                                  <div className="flex items-center overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
+                                    <FormInput
+                                      id={id}
+                                      error={error}
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      max="100"
+                                      className="rounded-xl border-0 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
+                                      {...rest}
+                                      onBlur={(e) => {
+                                        const maybeOnBlur = (
+                                          rest as {
+                                            onBlur?: (
+                                              ev: React.FocusEvent<HTMLInputElement>
+                                            ) => void;
+                                          }
+                                        ).onBlur;
+                                        maybeOnBlur?.(e);
+                                        syncSaleFromDiscount();
+                                      }}
+                                      disabled={isFreeCourse}
+                                    />
+                                    <span className="px-3 text-sm text-zinc-500">%</span>
+                                  </div>
+                                )}
+                              </FormField>
+                            </div>
                             <p className="text-xs text-zinc-500">
-                              No payment required; students can enroll for free.
+                              Sale price and discount % stay in sync. Leave both prices at 0 for a
+                              free course.
                             </p>
                           </div>
-                          <Switch
-                            checked={isFreeCourse}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                methods.setValue("priceRegular", 0, { shouldDirty: true });
-                                methods.setValue("priceSale", undefined, { shouldDirty: true });
-                                methods.setValue("discountPercent", 0, { shouldDirty: true });
-                              } else {
-                                methods.setValue("priceRegular", 99, { shouldDirty: true });
-                                methods.setValue("priceSale", undefined, { shouldDirty: true });
-                                methods.setValue("discountPercent", 0, { shouldDirty: true });
-                              }
-                            }}
-                            className="data-[state=checked]:bg-emerald-500"
-                          />
-                        </div>
+                        </CardContent>
+                      </Card>
 
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <FormField name="priceRegular" label="Original Price">
-                            {({ id, error, ...rest }) => (
-                              <div className="space-y-1.5">
-                                <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
-                                  <select
-                                    value={methods.watch("currency") ?? "USD"}
-                                    onChange={(e) => methods.setValue("currency", e.target.value)}
-                                    disabled={isFreeCourse}
-                                    className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
-                                  >
-                                    {CURRENCY_OPTIONS.map((c) => (
-                                      <option key={c.value} value={c.value}>
-                                        {c.value}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <FormInput
-                                    id={id}
-                                    error={error}
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
-                                    disabled={isFreeCourse}
-                                    {...rest}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </FormField>
-                          <FormField name="priceSale" label="Sale Price">
-                            {({ id, error, ...rest }) => (
-                              <div className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
-                                <select
-                                  value={methods.watch("currency") ?? "USD"}
-                                  onChange={(e) => methods.setValue("currency", e.target.value)}
-                                  disabled={isFreeCourse}
-                                  className="border-0 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none disabled:opacity-60"
-                                >
-                                  {CURRENCY_OPTIONS.map((c) => (
-                                    <option key={c.value} value={c.value}>
-                                      {c.value}
-                                    </option>
-                                  ))}
-                                </select>
-                                <FormInput
-                                  id={id}
-                                  error={error}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="rounded-none border-0 border-l border-zinc-200 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
-                                  {...rest}
-                                  onBlur={(e) => {
-                                    const maybeOnBlur = (rest as { onBlur?: (ev: React.FocusEvent<HTMLInputElement>) => void }).onBlur;
-                                    maybeOnBlur?.(e);
-                                    syncDiscountFromSale();
-                                  }}
-                                  disabled={isFreeCourse}
-                                />
-                              </div>
-                            )}
-                          </FormField>
-                          <FormField name="discountPercent" label="Discount %">
-                            {({ id, error, ...rest }) => (
-                              <div className="flex items-center overflow-hidden rounded-xl border border-zinc-200 bg-white focus-within:ring-2 focus-within:ring-zinc-400/40">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <FormField name="durationHours" label="Duration (hours)" required>
+                          {({ id, error, ...rest }) => (
+                            <FormInput
+                              id={id}
+                              error={error}
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              className="rounded-xl border-zinc-200"
+                              {...rest}
+                            />
+                          )}
+                        </FormField>
+                        <FormField name="enrolledCount" label="Fake Enrollment" required>
+                          {({ id, error, ...rest }) => (
+                            <div className="space-y-1.5">
+                              <div className="relative">
+                                <Users className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                                 <FormInput
                                   id={id}
                                   error={error}
                                   type="number"
                                   step="1"
                                   min="0"
-                                  max="100"
-                                  className="rounded-xl border-0 focus-visible:ring-0 disabled:bg-zinc-50 disabled:opacity-60"
+                                  className="rounded-xl border-zinc-200 pl-9"
                                   {...rest}
-                                  onBlur={(e) => {
-                                    const maybeOnBlur = (rest as { onBlur?: (ev: React.FocusEvent<HTMLInputElement>) => void }).onBlur;
-                                    maybeOnBlur?.(e);
-                                    syncSaleFromDiscount();
-                                  }}
-                                  disabled={isFreeCourse}
                                 />
-                                <span className="px-3 text-sm text-zinc-500">%</span>
                               </div>
-                            )}
-                          </FormField>
-                        </div>
-                        <p className="text-xs text-zinc-500">
-                          Sale price and discount % stay in sync. Leave both prices at 0 for a free course.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <FormField name="durationHours" label="Duration (hours)" required>
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
-                        />
-                      )}
-                    </FormField>
-                    <FormField name="enrolledCount" label="Fake Enrollment" required>
-                      {({ id, error, ...rest }) => (
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Users className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                              <p className="text-xs text-zinc-500">
+                                This number will be displayed as the enrollment count.
+                              </p>
+                            </div>
+                          )}
+                        </FormField>
+                        <FormField name="lessons" label="Lessons">
+                          {({ id, error, ...rest }) => (
                             <FormInput
                               id={id}
                               error={error}
                               type="number"
                               step="1"
                               min="0"
-                              className="rounded-xl border-zinc-200 pl-9"
+                              className="rounded-xl border-zinc-200"
                               {...rest}
                             />
+                          )}
+                        </FormField>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <FormField name="rating" label="Fake Rating (0–5)">
+                          {({ id, error, ...rest }) => (
+                            <div className="space-y-1.5">
+                              <FormInput
+                                id={id}
+                                error={error}
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="5"
+                                placeholder="e.g. 4.8"
+                                className="rounded-xl border-zinc-200"
+                                {...rest}
+                              />
+                              <p className="text-xs text-zinc-500">
+                                Shown to students as course rating (stars).
+                              </p>
+                            </div>
+                          )}
+                        </FormField>
+                        <FormField name="reviewCount" label="Fake Reviews">
+                          {({ id, error, ...rest }) => (
+                            <div className="space-y-1.5">
+                              <FormInput
+                                id={id}
+                                error={error}
+                                type="number"
+                                step="1"
+                                min="0"
+                                placeholder="e.g. 128"
+                                className="rounded-xl border-zinc-200"
+                                {...rest}
+                              />
+                              <p className="text-xs text-zinc-500">
+                                Shown to students as number of reviews.
+                              </p>
+                            </div>
+                          )}
+                        </FormField>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+                        <FormField name="instructorName" label="Instructor name" required>
+                          {({ id, error, ...rest }) => (
+                            <FormInput
+                              id={id}
+                              error={error}
+                              className="rounded-xl border-zinc-200"
+                              {...rest}
+                            />
+                          )}
+                        </FormField>
+                        <FormField name="instructorTitle" label="Instructor title" required>
+                          {({ id, error, ...rest }) => (
+                            <FormInput
+                              id={id}
+                              error={error}
+                              placeholder="e.g. CPHQ, Healthcare Quality Director"
+                              className="rounded-xl border-zinc-200"
+                              {...rest}
+                            />
+                          )}
+                        </FormField>
+                        <div className="space-y-1.5">
+                          <span className="text-sm font-medium text-zinc-700">Profile picture</span>
+                          <input
+                            ref={profileFileRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void setProfileFromFile(f);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => profileFileRef.current?.click()}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ")
+                                profileFileRef.current?.click();
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const f = e.dataTransfer.files?.[0];
+                              if (f) void setProfileFromFile(f);
+                            }}
+                            className={cn(
+                              "flex min-h-[72px] w-[120px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-2 text-center transition-colors hover:bg-zinc-100",
+                              instructorImageUrl && "border-zinc-300 bg-white"
+                            )}
+                          >
+                            {instructorImageUrl ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                {profileUploading ? (
+                                  <span className="text-xs text-amber-600">Uploading…</span>
+                                ) : (
+                                  <>
+                                    <Image
+                                      src={instructorImageUrl}
+                                      alt="Profile"
+                                      width={40}
+                                      height={40}
+                                      className="h-10 w-10 rounded-full object-cover ring-2 ring-zinc-200"
+                                      unoptimized
+                                    />
+                                    <span className="text-[10px] font-medium text-zinc-600">
+                                      Change
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                {profileUploading ? (
+                                  <span className="text-xs text-amber-600">Uploading…</span>
+                                ) : (
+                                  <>
+                                    <UploadCloud className="h-4 w-4 text-zinc-500" />
+                                    <span className="text-[10px] font-medium text-zinc-700">
+                                      Drop or click
+                                    </span>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
-                          <p className="text-xs text-zinc-500">
-                            This number will be displayed as the enrollment count.
-                          </p>
+                          {profileError ? (
+                            <p className="text-xs text-destructive">{profileError}</p>
+                          ) : null}
                         </div>
-                      )}
-                    </FormField>
-                    <FormField name="lessons" label="Lessons">
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          type="number"
-                          step="1"
-                          min="0"
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
-                        />
-                      )}
-                    </FormField>
+                      </div>
+
+                      <FormField name="description" label="Description" required>
+                        {({ id, error, ...rest }) => (
+                          <textarea
+                            id={id}
+                            aria-invalid={!!error}
+                            aria-describedby={error ? `${id}-error` : undefined}
+                            className={cn(
+                              "min-h-[120px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                              "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                              error && "border-destructive focus-visible:ring-destructive"
+                            )}
+                            placeholder="Write a clear, benefit-focused summary of the course…"
+                            {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                          />
+                        )}
+                      </FormField>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">What course includes?</CardTitle>
+                      <CardDescription>
+                        Add what learners will get (modules, mock exams, downloads, support).
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <FormField name="includes" label="What this course includes (optional)">
+                        {({ id, error, ...rest }) => (
+                          <textarea
+                            id={id}
+                            aria-invalid={!!error}
+                            aria-describedby={error ? `${id}-error` : undefined}
+                            className={cn(
+                              "min-h-[120px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                              "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                              error && "border-destructive focus-visible:ring-destructive"
+                            )}
+                            placeholder={
+                              "Example:\n- 12 high‑yield modules\n- 3 mock exams + explanations\n- Downloadable summaries\n- Weekly study plan"
+                            }
+                            {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                          />
+                        )}
+                      </FormField>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Users className="h-4 w-4 text-gold" />
+                          Who can attend
+                        </CardTitle>
+                        <CardDescription>Target audience and prerequisites.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <FormField name="whoCanAttend" label="Audience" required>
+                          {({ id, error, ...rest }) => (
+                            <textarea
+                              id={id}
+                              aria-invalid={!!error}
+                              aria-describedby={error ? `${id}-error` : undefined}
+                              className={cn(
+                                "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                                "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                                error && "border-destructive focus-visible:ring-destructive"
+                              )}
+                              placeholder="Who should take this course? (roles, experience level, prerequisites)"
+                              {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                            />
+                          )}
+                        </FormField>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Sparkles className="h-4 w-4 text-gold" />
+                          Why CPHQ with Yalla CPHQ
+                        </CardTitle>
+                        <CardDescription>Your unique value proposition.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <FormField name="whyYalla" label="Why Yalla CPHQ" required>
+                          {({ id, error, ...rest }) => (
+                            <textarea
+                              id={id}
+                              aria-invalid={!!error}
+                              aria-describedby={error ? `${id}-error` : undefined}
+                              className={cn(
+                                "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                                "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                                error && "border-destructive focus-visible:ring-destructive"
+                              )}
+                              placeholder="Why should learners choose Yalla CPHQ for this course?"
+                              {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                            />
+                          )}
+                        </FormField>
+                      </CardContent>
+                    </Card>
                   </div>
 
+                  <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Course page content</CardTitle>
+                      <CardDescription>
+                        Content that powers the public course details page from backend data.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 pt-0">
+                      <FormField name="learningOutcomesText" label="Learning outcomes">
+                        {({ id, error, ...rest }) => (
+                          <textarea
+                            id={id}
+                            aria-invalid={!!error}
+                            aria-describedby={error ? `${id}-error` : undefined}
+                            className={cn(
+                              "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
+                              "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
+                              error && "border-destructive focus-visible:ring-destructive"
+                            )}
+                            placeholder={
+                              "Add one learning outcome per line.\nExample:\nMaster the 5 CPHQ exam domains\nApply patient safety tools in real scenarios"
+                            }
+                            {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                          />
+                        )}
+                      </FormField>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <FormSelect
+                          name="certificationType"
+                          label="Certification type"
+                          options={
+                            CERTIFICATION_OPTIONS as unknown as { value: string; label: string }[]
+                          }
+                          placeholder="Select certification type"
+                        />
+                        <FormField name="imagePlaceholder" label="Image placeholder (optional)">
+                          {({ id, error, ...rest }) => (
+                            <FormInput
+                              id={id}
+                              error={error}
+                              placeholder="Fallback text for cover image"
+                              className="rounded-xl border-zinc-200"
+                              {...rest}
+                            />
+                          )}
+                        </FormField>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500">
+                      Tip: Keep the description short, clear, and exam-focused.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-zinc-200"
+                        onClick={() => {
+                          methods.reset();
+                          setCurriculumSections([]);
+                          setSelectedRelatedCourseIds([]);
+                          setReviewMediaItems([]);
+                          router.push("/admin/courses");
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                        Discard
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-zinc-200"
+                        onClick={() => setStep(2)}
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                      >
+                        <Check className="h-4 w-4" />
+                        {editId ? "Save changes" : "Create course"}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <div className="space-y-6">
+                    <div className="hidden flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-gold" aria-hidden />
+                          <h2 className="text-xl font-bold tracking-tight text-zinc-900">
+                            Lessons & Quizzes
+                          </h2>
+                        </div>
+                        <p className="mt-1 text-sm text-zinc-600">
+                          Review and edit the lessons and quizzes in your curriculum.
+                        </p>
+                      </div>
+
+                      <div className="w-full lg:max-w-sm">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                          <input
+                            value={curriculumQuery}
+                            onChange={(e) => setCurriculumQuery(e.target.value)}
+                            type="search"
+                            placeholder="Search lessons & quizzes..."
+                            className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <input
+                      ref={materialFileRef}
+                      type="file"
+                      accept=".pdf,.docx,.doc,.txt"
+                      className="hidden"
+                      onChange={handleMaterialUpload}
+                    />
+
+                    <Card className="hidden rounded-2xl border-zinc-200 bg-white shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Curriculum items</CardTitle>
+                        <CardDescription>All lessons and quizzes across modules.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4 pt-0">
+                        {curriculumSections.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10 text-center">
+                            <p className="text-sm font-semibold text-zinc-900">
+                              No lessons or quizzes yet
+                            </p>
+                            <p className="mt-1 text-sm text-zinc-500">
+                              Add a section on the left, then add lessons and quizzes.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {curriculumSections.map((section, sectionIndex) => {
+                              const displayTitle = /^\s*module\s*\d+/i.test(section.title)
+                                ? section.title
+                                : `Module ${sectionIndex + 1}: ${section.title}`;
+                              const lessonsCount = section.items.filter(
+                                (i) => i.type === "lecture"
+                              ).length;
+                              const quizzesCount = section.items.filter(
+                                (i) => i.type === "quiz"
+                              ).length;
+                              const filteredItems = curriculumQueryNormalized
+                                ? section.items.filter((i) =>
+                                    String(i.title ?? "")
+                                      .toLowerCase()
+                                      .includes(curriculumQueryNormalized)
+                                  )
+                                : section.items;
+
+                              return (
+                                <div
+                                  key={section.id}
+                                  className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-zinc-900">
+                                      {displayTitle}
+                                    </p>
+                                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                                      {lessonsCount} {lessonsCount === 1 ? "Lesson" : "Lessons"} ·{" "}
+                                      {quizzesCount} {quizzesCount === 1 ? "Quiz" : "Quizzes"}
+                                    </p>
+                                  </div>
+
+                                  <div className="mt-4 space-y-3">
+                                    {filteredItems.length === 0 ? (
+                                      <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-center">
+                                        <p className="text-sm font-semibold text-zinc-900">
+                                          {curriculumQueryNormalized
+                                            ? "No matching items"
+                                            : "No items yet"}
+                                        </p>
+                                        <p className="mt-1 text-sm text-zinc-500">
+                                          {curriculumQueryNormalized
+                                            ? "Try a different search term."
+                                            : "Add your first lesson or quiz for this module."}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      filteredItems.map((item) => {
+                                        if (item.type === "lecture") {
+                                          const lecture = item as CurriculumLecture;
+                                          return (
+                                            <div
+                                              key={lecture.id}
+                                              className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
+                                            >
+                                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                <div className="flex min-w-0 items-start gap-3">
+                                                  <Video
+                                                    className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500"
+                                                    aria-hidden
+                                                  />
+                                                  <div className="min-w-0 flex-1 space-y-3">
+                                                    <div className="space-y-1.5">
+                                                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                                        Lesson title
+                                                      </label>
+                                                      <input
+                                                        type="text"
+                                                        value={lecture.title}
+                                                        onChange={(e) =>
+                                                          updateLecture(section.id, lecture.id, {
+                                                            title: e.target.value,
+                                                          })
+                                                        }
+                                                        placeholder="Lesson title..."
+                                                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                      />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                                        Video URL
+                                                      </label>
+                                                      <input
+                                                        type="url"
+                                                        value={lecture.videoUrl}
+                                                        onChange={(e) =>
+                                                          updateLecture(section.id, lecture.id, {
+                                                            videoUrl: e.target.value,
+                                                          })
+                                                        }
+                                                        placeholder="https://www.youtube.com/watch?v=…"
+                                                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-end gap-2">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="whitespace-nowrap text-xs font-medium text-zinc-500">
+                                                      Free
+                                                    </span>
+                                                    <Switch
+                                                      checked={lecture.freeLecture}
+                                                      onCheckedChange={(checked) =>
+                                                        updateLecture(section.id, lecture.id, {
+                                                          freeLecture: !!checked,
+                                                        })
+                                                      }
+                                                      className="data-[state=checked]:bg-emerald-500"
+                                                      aria-label="Free lesson"
+                                                    />
+                                                  </div>
+                                                  <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-9 w-9 text-zinc-500 hover:text-destructive"
+                                                    onClick={() =>
+                                                      removeItem(section.id, lecture.id)
+                                                    }
+                                                    aria-label="Delete lesson"
+                                                  >
+                                                    <Trash2 className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+
+                                        const quiz = item as CurriculumQuiz;
+                                        const isQuizExpandedList = expandedQuizIds.has(quiz.id);
+                                        return (
+                                          <div
+                                            key={quiz.id}
+                                            className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+                                          >
+                                            <div className="flex items-center gap-3 p-4">
+                                              <FileQuestion
+                                                className="h-4 w-4 shrink-0 text-zinc-500"
+                                                aria-hidden
+                                              />
+                                              <input
+                                                type="text"
+                                                value={quiz.title}
+                                                onChange={(e) =>
+                                                  updateQuiz(section.id, quiz.id, {
+                                                    title: e.target.value,
+                                                  })
+                                                }
+                                                className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-zinc-900 outline-none focus:border-zinc-200 focus:bg-white"
+                                              />
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-zinc-600 hover:text-zinc-900"
+                                                onClick={() => toggleQuizExpanded(quiz.id)}
+                                              >
+                                                {isQuizExpandedList ? (
+                                                  <>
+                                                    Close <ChevronUp className="ml-1 h-4 w-4" />
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    Edit <ChevronDown className="ml-1 h-4 w-4" />
+                                                  </>
+                                                )}
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 text-zinc-500 hover:text-destructive"
+                                                onClick={() => removeItem(section.id, quiz.id)}
+                                                aria-label="Delete quiz"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                            {isQuizExpandedList ? (
+                                              <div className="space-y-4 border-t border-zinc-200 bg-zinc-50/50 p-4">
+                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                  <p className="text-sm text-zinc-600">
+                                                    Current:{" "}
+                                                    <span className="font-semibold text-zinc-900">
+                                                      {quiz.title}
+                                                    </span>
+                                                  </p>
+                                                  <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="rounded-xl border-zinc-200 text-zinc-600 hover:border-destructive/50 hover:text-destructive"
+                                                    onClick={() => {
+                                                      removeItem(section.id, quiz.id);
+                                                      toggleQuizExpanded(quiz.id);
+                                                    }}
+                                                  >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    Remove quiz
+                                                  </Button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                  <label className="text-sm font-medium text-zinc-700">
+                                                    Select from ready-made quizzes
+                                                  </label>
+                                                  <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                                    <input
+                                                      type="text"
+                                                      value={quizEditSearch[quiz.id] ?? ""}
+                                                      onChange={(e) =>
+                                                        setQuizEditSearch((prev) => ({
+                                                          ...prev,
+                                                          [quiz.id]: e.target.value,
+                                                        }))
+                                                      }
+                                                      placeholder="Search quizzes..."
+                                                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                    />
+                                                  </div>
+                                                  <div className="grid max-h-40 gap-1.5 overflow-y-auto">
+                                                    {(quizEditSearch[quiz.id]
+                                                      ? READY_MADE_QUIZZES.filter((q) =>
+                                                          q
+                                                            .toLowerCase()
+                                                            .includes(
+                                                              (
+                                                                quizEditSearch[quiz.id] ?? ""
+                                                              ).toLowerCase()
+                                                            )
+                                                        )
+                                                      : READY_MADE_QUIZZES
+                                                    ).map((title) => (
+                                                      <button
+                                                        key={title}
+                                                        type="button"
+                                                        onClick={() => {
+                                                          updateQuiz(section.id, quiz.id, {
+                                                            title,
+                                                          });
+                                                          setQuizEditSearch((prev) => {
+                                                            const next = { ...prev };
+                                                            delete next[quiz.id];
+                                                            return next;
+                                                          });
+                                                        }}
+                                                        className={cn(
+                                                          "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                                          quiz.title === title
+                                                            ? "border-gold bg-gold/10 text-zinc-900"
+                                                            : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                                                        )}
+                                                      >
+                                                        <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" />
+                                                        {title}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-xl border-zinc-200"
+                                      onClick={() => addLecture(section.id)}
+                                    >
+                                      <Video className="h-4 w-4" />
+                                      Add Lesson
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-xl border-zinc-200"
+                                      onClick={() => openAddQuizModal(section.id)}
+                                    >
+                                      <FileQuestion className="h-4 w-4" />
+                                      Add Quiz
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <div className="grid gap-6">
+                      <Card className="flex max-h-[80vh] flex-col rounded-2xl border-zinc-200 bg-white shadow-sm">
+                        <CardContent className="flex min-h-0 flex-col pt-0">
+                          {activeSection ? (
+                            <div className="flex max-h-[80vh] min-h-0 flex-col p-6">
+                              <h3 className="shrink-0 text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">
+                                {activeSectionDisplayTitle}
+                              </h3>
+
+                              <div className="mt-6 min-h-0 flex-1 overflow-y-auto">
+                                {previewMode ? (
+                                  <div className="space-y-3">
+                                    {filteredActiveItems.map((item) => {
+                                      if (item.type === "lecture") {
+                                        const isLectureExpanded = expandedLectureIds.has(item.id);
+                                        return (
+                                          <div
+                                            key={item.id}
+                                            onDragOver={(e) => {
+                                              if (!draggingCurriculumItemId) return;
+                                              e.preventDefault();
+                                              setDragOverCurriculumItemId(item.id);
+                                            }}
+                                            onDragLeave={() => {
+                                              setDragOverCurriculumItemId((prev) =>
+                                                prev === item.id ? null : prev
+                                              );
+                                            }}
+                                            onDrop={(e) => {
+                                              if (!activeSection) return;
+                                              e.preventDefault();
+                                              const activeId =
+                                                draggingCurriculumItemId ??
+                                                e.dataTransfer.getData("text/plain");
+                                              if (!activeId || activeId === item.id) return;
+                                              reorderSectionItem(
+                                                activeSection.id,
+                                                activeId,
+                                                item.id
+                                              );
+                                              setDraggingCurriculumItemId(null);
+                                              setDragOverCurriculumItemId(null);
+                                            }}
+                                            className={cn(
+                                              "overflow-hidden rounded-2xl border bg-white shadow-sm",
+                                              dragOverCurriculumItemId === item.id &&
+                                                draggingCurriculumItemId !== item.id
+                                                ? "border-gold/40 ring-2 ring-gold/30"
+                                                : "border-zinc-200"
+                                            )}
+                                          >
+                                            <div className="flex items-center gap-3 p-4">
+                                              <button
+                                                type="button"
+                                                draggable
+                                                onDragStart={(e) => {
+                                                  e.dataTransfer.setData("text/plain", item.id);
+                                                  e.dataTransfer.effectAllowed = "move";
+                                                  setDraggingCurriculumItemId(item.id);
+                                                }}
+                                                onDragEnd={() => {
+                                                  setDraggingCurriculumItemId(null);
+                                                  setDragOverCurriculumItemId(null);
+                                                }}
+                                                className="cursor-grab rounded-md p-1 text-zinc-400 hover:text-zinc-700 active:cursor-grabbing"
+                                                aria-label="Drag to reorder"
+                                              >
+                                                <GripVertical className="h-4 w-4" aria-hidden />
+                                              </button>
+                                              <Video
+                                                className="h-4 w-4 shrink-0 text-zinc-500"
+                                                aria-hidden
+                                              />
+                                              <input
+                                                type="text"
+                                                value={item.title}
+                                                onChange={(e) =>
+                                                  updateLecture(activeSection.id, item.id, {
+                                                    title: e.target.value,
+                                                  })
+                                                }
+                                                className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-zinc-900 outline-none focus:border-zinc-200 focus:bg-white"
+                                              />
+                                              <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="whitespace-nowrap text-xs font-medium text-zinc-500">
+                                                    Free
+                                                  </span>
+                                                  <Switch
+                                                    checked={item.freeLecture}
+                                                    onCheckedChange={(checked) =>
+                                                      updateLecture(activeSection.id, item.id, {
+                                                        freeLecture: !!checked,
+                                                      })
+                                                    }
+                                                    className="data-[state=checked]:bg-emerald-500"
+                                                    aria-label="Free lesson"
+                                                  />
+                                                </div>
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="text-zinc-600 hover:text-zinc-900"
+                                                  onClick={() => toggleLectureExpanded(item.id)}
+                                                >
+                                                  {isLectureExpanded ? (
+                                                    <>
+                                                      Close <ChevronUp className="ml-1 h-4 w-4" />
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      Edit <ChevronDown className="ml-1 h-4 w-4" />
+                                                    </>
+                                                  )}
+                                                </Button>
+                                              </div>
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 text-zinc-500 hover:text-destructive"
+                                                onClick={() =>
+                                                  removeItem(activeSection.id, item.id)
+                                                }
+                                                aria-label="Delete lesson"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+
+                                            {isLectureExpanded ? (
+                                              <div className="space-y-4 border-t border-zinc-200 bg-zinc-50/50 p-4">
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                  <div className="space-y-1.5">
+                                                    <label className="text-sm font-medium text-zinc-700">
+                                                      Video URL
+                                                    </label>
+                                                    <input
+                                                      type="url"
+                                                      value={item.videoUrl}
+                                                      onChange={(e) =>
+                                                        updateLecture(activeSection.id, item.id, {
+                                                          videoUrl: e.target.value,
+                                                        })
+                                                      }
+                                                      placeholder="https://www.youtube.com/watch?v=…"
+                                                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                    />
+                                                  </div>
+                                                  <div className="space-y-1.5">
+                                                    <label className="text-sm font-medium text-zinc-700">
+                                                      Material URL
+                                                    </label>
+                                                    <div className="flex gap-2">
+                                                      <div className="relative flex-1">
+                                                        <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                                        <input
+                                                          type="url"
+                                                          value={item.materialUrl}
+                                                          onChange={(e) =>
+                                                            updateLecture(
+                                                              activeSection.id,
+                                                              item.id,
+                                                              {
+                                                                materialUrl: e.target.value,
+                                                                materialFileName: undefined,
+                                                                materialDataUrl: undefined,
+                                                              }
+                                                            )
+                                                          }
+                                                          placeholder="https://…"
+                                                          className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                        />
+                                                      </div>
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="h-10 rounded-xl border-zinc-200"
+                                                        onClick={() =>
+                                                          triggerMaterialUpload(item.id)
+                                                        }
+                                                      >
+                                                        <UploadCloud className="h-4 w-4" />
+                                                      </Button>
+                                                    </div>
+                                                    {item.materialFileName ? (
+                                                      <p className="text-xs text-zinc-500">
+                                                        Uploaded:{" "}
+                                                        <span className="font-medium text-zinc-700">
+                                                          {item.materialFileName}
+                                                        </span>
+                                                      </p>
+                                                    ) : null}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      }
+
+                                      const isQuizExpanded = expandedQuizIds.has(item.id);
+                                      return (
+                                        <div
+                                          key={item.id}
+                                          onDragOver={(e) => {
+                                            if (!draggingCurriculumItemId) return;
+                                            e.preventDefault();
+                                            setDragOverCurriculumItemId(item.id);
+                                          }}
+                                          onDragLeave={() => {
+                                            setDragOverCurriculumItemId((prev) =>
+                                              prev === item.id ? null : prev
+                                            );
+                                          }}
+                                          onDrop={(e) => {
+                                            if (!activeSection) return;
+                                            e.preventDefault();
+                                            const activeId =
+                                              draggingCurriculumItemId ??
+                                              e.dataTransfer.getData("text/plain");
+                                            if (!activeId || activeId === item.id) return;
+                                            reorderSectionItem(activeSection.id, activeId, item.id);
+                                            setDraggingCurriculumItemId(null);
+                                            setDragOverCurriculumItemId(null);
+                                          }}
+                                          className={cn(
+                                            "overflow-hidden rounded-2xl border bg-white shadow-sm",
+                                            dragOverCurriculumItemId === item.id &&
+                                              draggingCurriculumItemId !== item.id
+                                              ? "border-gold/40 ring-2 ring-gold/30"
+                                              : "border-zinc-200"
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-3 p-4">
+                                            <button
+                                              type="button"
+                                              draggable
+                                              onDragStart={(e) => {
+                                                e.dataTransfer.setData("text/plain", item.id);
+                                                e.dataTransfer.effectAllowed = "move";
+                                                setDraggingCurriculumItemId(item.id);
+                                              }}
+                                              onDragEnd={() => {
+                                                setDraggingCurriculumItemId(null);
+                                                setDragOverCurriculumItemId(null);
+                                              }}
+                                              className="cursor-grab rounded-md p-1 text-zinc-400 hover:text-zinc-700 active:cursor-grabbing"
+                                              aria-label="Drag to reorder"
+                                            >
+                                              <GripVertical className="h-4 w-4" aria-hidden />
+                                            </button>
+                                            <FileQuestion
+                                              className="h-4 w-4 shrink-0 text-zinc-500"
+                                              aria-hidden
+                                            />
+                                            <input
+                                              type="text"
+                                              value={item.title}
+                                              onChange={(e) =>
+                                                updateQuiz(activeSection.id, item.id, {
+                                                  title: e.target.value,
+                                                })
+                                              }
+                                              className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-zinc-900 outline-none focus:border-zinc-200 focus:bg-white"
+                                            />
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-zinc-600 hover:text-zinc-900"
+                                              onClick={() => toggleQuizExpanded(item.id)}
+                                            >
+                                              {isQuizExpanded ? (
+                                                <>
+                                                  Close <ChevronUp className="ml-1 h-4 w-4" />
+                                                </>
+                                              ) : (
+                                                <>
+                                                  Edit <ChevronDown className="ml-1 h-4 w-4" />
+                                                </>
+                                              )}
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-9 w-9 text-zinc-500 hover:text-destructive"
+                                              onClick={() => removeItem(activeSection.id, item.id)}
+                                              aria-label="Delete quiz"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+
+                                          {isQuizExpanded ? (
+                                            <div className="space-y-4 border-t border-zinc-200 bg-zinc-50/50 p-4">
+                                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                                <p className="text-sm text-zinc-600">
+                                                  Current:{" "}
+                                                  <span className="font-semibold text-zinc-900">
+                                                    {item.title}
+                                                  </span>
+                                                </p>
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="rounded-xl border-zinc-200 text-zinc-600 hover:border-destructive/50 hover:text-destructive"
+                                                  onClick={() => {
+                                                    removeItem(activeSection.id, item.id);
+                                                    toggleQuizExpanded(item.id);
+                                                  }}
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                  Remove quiz
+                                                </Button>
+                                              </div>
+                                              <div className="space-y-2">
+                                                <label className="text-sm font-medium text-zinc-700">
+                                                  Select from ready-made quizzes
+                                                </label>
+                                                <div className="relative">
+                                                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                                  <input
+                                                    type="text"
+                                                    value={quizEditSearch[item.id] ?? ""}
+                                                    onChange={(e) =>
+                                                      setQuizEditSearch((prev) => ({
+                                                        ...prev,
+                                                        [item.id]: e.target.value,
+                                                      }))
+                                                    }
+                                                    placeholder="Search quizzes..."
+                                                    className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                  />
+                                                </div>
+                                                <div className="grid max-h-40 gap-1.5 overflow-y-auto">
+                                                  {(quizEditSearch[item.id]
+                                                    ? READY_MADE_QUIZZES.filter((q) =>
+                                                        q
+                                                          .toLowerCase()
+                                                          .includes(
+                                                            (
+                                                              quizEditSearch[item.id] ?? ""
+                                                            ).toLowerCase()
+                                                          )
+                                                      )
+                                                    : READY_MADE_QUIZZES
+                                                  ).map((title) => (
+                                                    <button
+                                                      key={title}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        updateQuiz(activeSection.id, item.id, {
+                                                          title,
+                                                        });
+                                                        setQuizEditSearch((prev) => {
+                                                          const next = { ...prev };
+                                                          delete next[item.id];
+                                                          return next;
+                                                        });
+                                                      }}
+                                                      className={cn(
+                                                        "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                                        item.title === title
+                                                          ? "border-gold bg-gold/10 text-zinc-900"
+                                                          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                                                      )}
+                                                    >
+                                                      <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" />
+                                                      {title}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      );
+                                    })}
+                                    <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl border-zinc-200"
+                                        onClick={() => openAddLessonModal(activeSection.id)}
+                                      >
+                                        <Video className="h-4 w-4" />
+                                        Add Lesson
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl border-zinc-200"
+                                        onClick={() => openAddQuizModal(activeSection.id)}
+                                      >
+                                        <FileQuestion className="h-4 w-4" />
+                                        Add Quiz
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : builderTab === "lesson" ? (
+                                  <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                                    <input
+                                      ref={lessonThumbRef}
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        setDraftLessonThumbName(f?.name ?? "");
+                                        e.currentTarget.value = "";
+                                      }}
+                                    />
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                          Lesson title
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={draftLessonTitle}
+                                          onChange={(e) => setDraftLessonTitle(e.target.value)}
+                                          placeholder="e.g. Introduction to Healthcare Quality"
+                                          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                          Video URL (Vimeo/YouTube)
+                                        </label>
+                                        <input
+                                          type="url"
+                                          value={draftLessonVideoUrl}
+                                          onChange={(e) => setDraftLessonVideoUrl(e.target.value)}
+                                          placeholder="https://vimeo.com/…"
+                                          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-4 space-y-1.5">
+                                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                        Lesson description
+                                      </label>
+                                      <textarea
+                                        value={draftLessonDescription}
+                                        onChange={(e) => setDraftLessonDescription(e.target.value)}
+                                        placeholder="Brief overview of what the student will learn..."
+                                        rows={4}
+                                        className="w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                      />
+                                    </div>
+
+                                    <div className="mt-5 space-y-2">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                        Thumbnail image
+                                      </p>
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => lessonThumbRef.current?.click()}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" || e.key === " ")
+                                            lessonThumbRef.current?.click();
+                                        }}
+                                        className="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center"
+                                      >
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-zinc-700 shadow-sm">
+                                          <UploadCloud className="h-5 w-5" />
+                                        </div>
+                                        <div className="text-sm font-semibold text-zinc-900">
+                                          Click to upload lesson thumbnail
+                                        </div>
+                                        <div className="text-xs text-zinc-500">
+                                          Recommended: 1280x720px (JPG, PNG)
+                                        </div>
+                                        {draftLessonThumbName ? (
+                                          <div className="text-xs text-zinc-600">
+                                            Selected:{" "}
+                                            <span className="font-medium text-zinc-800">
+                                              {draftLessonThumbName}
+                                            </span>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                                        onClick={() => {
+                                          setDraftLessonTitle("");
+                                          setDraftLessonVideoUrl("");
+                                          setDraftLessonDescription("");
+                                          setDraftLessonThumbName("");
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                                        onClick={() => {
+                                          addLecture(activeSection.id, {
+                                            title: draftLessonTitle,
+                                            videoUrl: draftLessonVideoUrl,
+                                          });
+                                          setDraftLessonTitle("");
+                                          setDraftLessonVideoUrl("");
+                                          setDraftLessonDescription("");
+                                          setDraftLessonThumbName("");
+                                          setPreviewMode(true);
+                                        }}
+                                      >
+                                        Save Lesson
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : builderTab === "quiz" ? (
+                                  <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                                    <div className="space-y-1.5">
+                                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                        Quiz title
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={draftQuizTitle}
+                                        onChange={(e) => setDraftQuizTitle(e.target.value)}
+                                        placeholder="e.g. Knowledge Check"
+                                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                      />
+                                    </div>
+
+                                    <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                                        onClick={() => setDraftQuizTitle("")}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                                        onClick={() => {
+                                          addQuiz(activeSection.id, { title: draftQuizTitle });
+                                          setDraftQuizTitle("");
+                                          setPreviewMode(true);
+                                        }}
+                                      >
+                                        Save Quiz
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                          Select lesson
+                                        </label>
+                                        <select
+                                          value={materialLectureId}
+                                          onChange={(e) => setMaterialLectureId(e.target.value)}
+                                          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                        >
+                                          <option value="" disabled>
+                                            {activeLectures.length > 0
+                                              ? "Choose a lesson…"
+                                              : "No lessons yet"}
+                                          </option>
+                                          {activeLectures.map((l) => (
+                                            <option key={l.id} value={l.id}>
+                                              {l.title}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                          Material URL
+                                        </label>
+                                        <input
+                                          type="url"
+                                          value={materialUrlDraft}
+                                          onChange={(e) => setMaterialUrlDraft(e.target.value)}
+                                          placeholder="https://…"
+                                          className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl border-zinc-200"
+                                        onClick={() => {
+                                          if (!materialLectureId) return;
+                                          triggerMaterialUpload(materialLectureId);
+                                        }}
+                                        disabled={!materialLectureId}
+                                      >
+                                        <UploadCloud className="h-4 w-4" />
+                                        Upload File
+                                      </Button>
+
+                                      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          className="h-10 rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                                          onClick={() => setMaterialUrlDraft("")}
+                                          disabled={!materialLectureId}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                                          onClick={() => {
+                                            if (!materialLectureId) return;
+                                            updateLecture(activeSection.id, materialLectureId, {
+                                              materialUrl: materialUrlDraft,
+                                              materialFileName: undefined,
+                                              materialDataUrl: undefined,
+                                            });
+                                            setPreviewMode(true);
+                                          }}
+                                          disabled={!materialLectureId}
+                                        >
+                                          Save Material
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card className="hidden rounded-2xl border-zinc-200 bg-white shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Student review media</CardTitle>
+                        <CardDescription>
+                          Add image, video, or YouTube review items for the public course page
+                          gallery.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4 pt-0">
+                        {reviewMediaItems.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
+                            No review media added yet.
+                          </div>
+                        ) : null}
+
+                        {reviewMediaItems.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-zinc-900">
+                                  Media item {index + 1}
+                                </p>
+                                <p className="text-xs text-zinc-500">
+                                  Add a hosted image/video URL or a YouTube link.
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-zinc-500 hover:text-destructive"
+                                onClick={() => removeReviewMediaItem(item.id)}
+                                aria-label="Remove review media item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-zinc-700">Type</label>
+                                <select
+                                  value={item.kind}
+                                  onChange={(e) =>
+                                    updateReviewMediaItem(item.id, {
+                                      kind: e.target.value as ReviewMediaFormItem["kind"],
+                                    })
+                                  }
+                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                >
+                                  <option value="youtube">YouTube</option>
+                                  <option value="video">Video</option>
+                                  <option value="image">Image</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-zinc-700">
+                                  Source URL
+                                </label>
+                                <input
+                                  type="url"
+                                  value={item.src}
+                                  onChange={(e) =>
+                                    updateReviewMediaItem(item.id, { src: e.target.value })
+                                  }
+                                  placeholder={
+                                    item.kind === "youtube"
+                                      ? "https://www.youtube.com/watch?v=..."
+                                      : "https://example.com/media-file"
+                                  }
+                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-zinc-700">Caption</label>
+                                <input
+                                  type="text"
+                                  value={item.caption}
+                                  onChange={(e) =>
+                                    updateReviewMediaItem(item.id, { caption: e.target.value })
+                                  }
+                                  placeholder="Optional caption"
+                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-zinc-700">
+                                  Poster URL
+                                </label>
+                                <input
+                                  type="url"
+                                  value={item.poster}
+                                  onChange={(e) =>
+                                    updateReviewMediaItem(item.id, { poster: e.target.value })
+                                  }
+                                  placeholder="Optional poster / thumbnail URL"
+                                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl border-dashed border-zinc-300 py-5 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900"
+                          onClick={addReviewMediaItem}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Review Media
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <p className="hidden text-xs text-zinc-500">
+                      Step 2: Define your course structure and lessons.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-zinc-200"
+                        onClick={() => setStep(1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                      >
+                        <Check className="h-4 w-4" />
+                        {editId ? "Save changes" : "Create course"}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </form>
+
+            <Dialog
+              open={addLessonOpen}
+              onOpenChange={(open) => {
+                if (!open) closeAddLessonModal();
+                else setAddLessonOpen(true);
+              }}
+            >
+              <DialogContent
+                showClose={false}
+                className="max-w-3xl overflow-hidden rounded-3xl border-zinc-200 p-0"
+              >
+                <div className="flex items-center justify-between gap-4 bg-gold px-5 py-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/10 text-zinc-900">
+                      <Video className="h-5 w-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <DialogTitle className="text-base font-semibold text-zinc-900">
+                        Add New Lesson
+                      </DialogTitle>
+                      <DialogDescription className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-zinc-900/70">
+                        {addLessonModuleLabel}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                  <DialogClose asChild>
+                    <button
+                      type="button"
+                      className="rounded-xl p-2 text-zinc-900/70 transition-colors hover:bg-black/10 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-black/20"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" aria-hidden />
+                    </button>
+                  </DialogClose>
+                </div>
+
+                <div className="bg-white px-6 py-6">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField name="rating" label="Fake Rating (0–5)">
-                      {({ id, error, ...rest }) => (
-                        <div className="space-y-1.5">
-                          <FormInput
-                            id={id}
-                            error={error}
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="5"
-                            placeholder="e.g. 4.8"
-                            className="rounded-xl border-zinc-200"
-                            {...rest}
-                          />
-                          <p className="text-xs text-zinc-500">
-                            Shown to students as course rating (stars).
-                          </p>
-                        </div>
-                      )}
-                    </FormField>
-                    <FormField name="reviewCount" label="Fake Reviews">
-                      {({ id, error, ...rest }) => (
-                        <div className="space-y-1.5">
-                          <FormInput
-                            id={id}
-                            error={error}
-                            type="number"
-                            step="1"
-                            min="0"
-                            placeholder="e.g. 128"
-                            className="rounded-xl border-zinc-200"
-                            {...rest}
-                          />
-                          <p className="text-xs text-zinc-500">
-                            Shown to students as number of reviews.
-                          </p>
-                        </div>
-                      )}
-                    </FormField>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Lesson title
+                      </label>
+                      <input
+                        type="text"
+                        value={draftLessonTitle}
+                        onChange={(e) => setDraftLessonTitle(e.target.value)}
+                        placeholder="e.g. Introduction to Healthcare Quality"
+                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Video URL (Vimeo/YouTube)
+                      </label>
+                      <input
+                        type="url"
+                        value={draftLessonVideoUrl}
+                        onChange={(e) => setDraftLessonVideoUrl(e.target.value)}
+                        placeholder="https://vimeo.com/…"
+                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Lesson description
+                      </label>
+                      <textarea
+                        value={draftLessonDescription}
+                        onChange={(e) => setDraftLessonDescription(e.target.value)}
+                        rows={4}
+                        placeholder="Brief overview of what the student will learn…"
+                        className="w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                      />
+                    </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
-                    <FormField name="instructorName" label="Instructor name" required>
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
+                  <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-10 rounded-xl"
+                      onClick={closeAddLessonModal}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                      disabled={!canSaveLesson}
+                      onClick={() => {
+                        if (!addLessonSectionId) return;
+                        const title = draftLessonTitle.trim();
+                        if (!title) return;
+                        addLecture(addLessonSectionId, {
+                          title,
+                          videoUrl: draftLessonVideoUrl.trim(),
+                          description: draftLessonDescription.trim(),
+                        });
+                        closeAddLessonModal();
+                      }}
+                    >
+                      Save Lesson
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={addQuizSectionId !== null}
+              onOpenChange={(open) => {
+                if (!open) closeAddQuizModal();
+              }}
+            >
+              <DialogContent
+                showClose={false}
+                className="max-w-2xl overflow-hidden rounded-3xl border-zinc-200 p-0"
+              >
+                <div className="flex items-center justify-between gap-4 bg-gold px-5 py-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/10 text-zinc-900">
+                      <FileQuestion className="h-5 w-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <DialogTitle className="text-base font-semibold text-zinc-900">
+                        Add Quiz
+                      </DialogTitle>
+                      <DialogDescription className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-zinc-900/70">
+                        {addQuizModuleLabel}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                  <DialogClose asChild>
+                    <button
+                      type="button"
+                      className="rounded-xl p-2 text-zinc-900/70 transition-colors hover:bg-black/10 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-black/20"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" aria-hidden />
+                    </button>
+                  </DialogClose>
+                </div>
+
+                <div className="bg-white px-6 py-6">
+                  <p className="mb-4 text-sm text-zinc-600">
+                    Select a ready-made quiz to add to this module.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {READY_MADE_QUIZZES.map((title) => (
+                      <button
+                        key={title}
+                        type="button"
+                        onClick={() => {
+                          if (!addQuizSectionId) return;
+                          addQuiz(addQuizSectionId, { title });
+                          closeAddQuizModal();
+                          setPreviewMode(true);
+                        }}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:border-gold/50 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-gold/30"
+                      >
+                        <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                        {title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Side panel */}
+            <aside
+              className={cn(
+                "min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start",
+                step === 2 ? "-mt-4 pt-0 md:-mt-6 xl:order-1" : "xl:order-2"
+              )}
+            >
+              {step === 2 ? (
+                <>
+                  <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-2xl font-bold tracking-tight text-zinc-900">
+                        Sections
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-0">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newSectionTitle}
+                          onChange={(e) => setNewSectionTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (!newSectionTitle.trim()) return;
+                              addSection(newSectionTitle);
+                              setNewSectionTitle("");
+                            }
+                          }}
+                          placeholder="Section Title..."
+                          className="h-10 flex-1 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                         />
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-10 w-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                          onClick={() => {
+                            if (!newSectionTitle.trim()) return;
+                            addSection(newSectionTitle);
+                            setNewSectionTitle("");
+                          }}
+                          aria-label="Add section"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {curriculumSections.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-center">
+                          <p className="text-sm font-semibold text-zinc-900">No sections yet</p>
+                          <p className="mt-1 text-sm text-zinc-500">
+                            Add your first section to start building the curriculum.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {curriculumSections.map((section, index) => {
+                            const lessonsCount = section.items.filter(
+                              (i) => i.type === "lecture"
+                            ).length;
+                            const quizzesCount = section.items.filter(
+                              (i) => i.type === "quiz"
+                            ).length;
+                            const isActive = activeSection?.id === section.id;
+                            const displayTitle = /^\s*module\s*\d+/i.test(section.title)
+                              ? section.title
+                              : `Module ${index + 1}: ${section.title}`;
+
+                            return (
+                              <button
+                                key={section.id}
+                                type="button"
+                                onClick={() => toggleSectionExpanded(section.id)}
+                                className={cn(
+                                  "w-full rounded-2xl border p-4 text-left shadow-sm transition",
+                                  isActive
+                                    ? "border-gold/30 bg-gold/10"
+                                    : "border-zinc-200 bg-white hover:bg-zinc-50"
+                                )}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={cn(
+                                      "flex h-10 w-10 items-center justify-center rounded-2xl",
+                                      isActive ? "text-gold" : "text-zinc-400"
+                                    )}
+                                  >
+                                    <GripVertical className="h-5 w-5" aria-hidden />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-base font-semibold text-zinc-900">
+                                      {displayTitle}
+                                    </p>
+                                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                                      {lessonsCount} {lessonsCount === 1 ? "Lesson" : "Lessons"} ·{" "}
+                                      {quizzesCount} {quizzesCount === 1 ? "Quiz" : "Quizzes"}
+                                    </p>
+                                  </div>
+                                  <ChevronRight
+                                    className="h-4 w-4 shrink-0 text-zinc-400"
+                                    aria-hidden
+                                  />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    </FormField>
-                    <FormField name="instructorTitle" label="Instructor title" required>
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          placeholder="e.g. CPHQ, Healthcare Quality Director"
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
-                        />
-                      )}
-                    </FormField>
-                    <div className="space-y-1.5">
-                      <span className="text-sm font-medium text-zinc-700">Profile picture</span>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <>
+                  <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Course Cover</CardTitle>
+                      <CardDescription>
+                        Upload an image or paste a URL. Recommended: 1200×630px.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-0">
                       <input
-                        ref={profileFileRef}
+                        ref={fileRef}
                         type="file"
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
-                          if (f) void setProfileFromFile(f);
+                          if (f) void setCoverFromFile(f);
                           e.currentTarget.value = "";
                         }}
                       />
+
                       <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => profileFileRef.current?.click()}
+                        onClick={() => fileRef.current?.click()}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") profileFileRef.current?.click();
+                          if (e.key === "Enter" || e.key === " ") fileRef.current?.click();
                         }}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.preventDefault();
                           const f = e.dataTransfer.files?.[0];
-                          if (f) void setProfileFromFile(f);
+                          if (f) void setCoverFromFile(f);
                         }}
-                        className={cn(
-                          "flex min-h-[72px] w-[120px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-2 text-center transition-colors hover:bg-zinc-100",
-                          instructorImageUrl && "border-zinc-300 bg-white"
-                        )}
+                        className="flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-center"
                       >
-                        {instructorImageUrl ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            {profileUploading ? (
-                              <span className="text-xs text-amber-600">Uploading…</span>
-                            ) : (
-                              <>
-                                <Image
-                                  src={instructorImageUrl}
-                                  alt="Profile"
-                                  width={40}
-                                  height={40}
-                                  className="h-10 w-10 rounded-full object-cover ring-2 ring-zinc-200"
-                                  unoptimized
-                                />
-                                <span className="text-[10px] font-medium text-zinc-600">Change</span>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            {profileUploading ? (
-                              <span className="text-xs text-amber-600">Uploading…</span>
-                            ) : (
-                              <>
-                                <UploadCloud className="h-4 w-4 text-zinc-500" />
-                                <span className="text-[10px] font-medium text-zinc-700">
-                                  Drop or click
-                                </span>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      {profileError ? (
-                        <p className="text-xs text-destructive">{profileError}</p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <FormField name="description" label="Description" required>
-                    {({ id, error, ...rest }) => (
-                      <textarea
-                        id={id}
-                        aria-invalid={!!error}
-                        aria-describedby={error ? `${id}-error` : undefined}
-                        className={cn(
-                          "min-h-[120px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
-                          "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
-                          error && "border-destructive focus-visible:ring-destructive"
-                        )}
-                        placeholder="Write a clear, benefit-focused summary of the course…"
-                        {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                      />
-                    )}
-                  </FormField>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">What course includes?</CardTitle>
-                  <CardDescription>
-                    Add what learners will get (modules, mock exams, downloads, support).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <FormField name="includes" label="What this course includes (optional)">
-                    {({ id, error, ...rest }) => (
-                      <textarea
-                        id={id}
-                        aria-invalid={!!error}
-                        aria-describedby={error ? `${id}-error` : undefined}
-                        className={cn(
-                          "min-h-[120px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
-                          "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
-                          error && "border-destructive focus-visible:ring-destructive"
-                        )}
-                        placeholder={
-                          "Example:\n- 12 high‑yield modules\n- 3 mock exams + explanations\n- Downloadable summaries\n- Weekly study plan"
-                        }
-                        {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                      />
-                    )}
-                  </FormField>
-                </CardContent>
-              </Card>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Users className="h-4 w-4 text-gold" />
-                      Who can attend
-                    </CardTitle>
-                    <CardDescription>Target audience and prerequisites.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <FormField name="whoCanAttend" label="Audience" required>
-                      {({ id, error, ...rest }) => (
-                        <textarea
-                          id={id}
-                          aria-invalid={!!error}
-                          aria-describedby={error ? `${id}-error` : undefined}
-                          className={cn(
-                            "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
-                            "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
-                            error && "border-destructive focus-visible:ring-destructive"
-                          )}
-                          placeholder="Who should take this course? (roles, experience level, prerequisites)"
-                          {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                        />
-                      )}
-                    </FormField>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Sparkles className="h-4 w-4 text-gold" />
-                      Why CPHQ with Yalla CPHQ
-                    </CardTitle>
-                    <CardDescription>Your unique value proposition.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <FormField name="whyYalla" label="Why Yalla CPHQ" required>
-                      {({ id, error, ...rest }) => (
-                        <textarea
-                          id={id}
-                          aria-invalid={!!error}
-                          aria-describedby={error ? `${id}-error` : undefined}
-                          className={cn(
-                            "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
-                            "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
-                            error && "border-destructive focus-visible:ring-destructive"
-                          )}
-                          placeholder="Why should learners choose Yalla CPHQ for this course?"
-                          {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                        />
-                      )}
-                    </FormField>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Course page content</CardTitle>
-                  <CardDescription>
-                    Content that powers the public course details page from backend data.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 pt-0">
-                  <FormField name="learningOutcomesText" label="Learning outcomes">
-                    {({ id, error, ...rest }) => (
-                      <textarea
-                        id={id}
-                        aria-invalid={!!error}
-                        aria-describedby={error ? `${id}-error` : undefined}
-                        className={cn(
-                          "min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none",
-                          "focus-visible:ring-2 focus-visible:ring-zinc-400/40",
-                          error && "border-destructive focus-visible:ring-destructive"
-                        )}
-                        placeholder={"Add one learning outcome per line.\nExample:\nMaster the 5 CPHQ exam domains\nApply patient safety tools in real scenarios"}
-                        {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                      />
-                    )}
-                  </FormField>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormSelect
-                      name="certificationType"
-                      label="Certification type"
-                      options={CERTIFICATION_OPTIONS as unknown as { value: string; label: string }[]}
-                      placeholder="Select certification type"
-                    />
-                    <FormField name="imagePlaceholder" label="Image placeholder (optional)">
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          placeholder="Fallback text for cover image"
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
-                        />
-                      )}
-                    </FormField>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Discovery &amp; enrollment</CardTitle>
-                  <CardDescription>
-                    Control visibility, featured placement, and related course recommendations.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-0">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900">Enable enrollment</p>
-                        <p className="text-xs text-zinc-500">Allow students to enroll or checkout for this course.</p>
-                      </div>
-                      <Switch
-                        checked={methods.watch("enableEnrollment") ?? true}
-                        onCheckedChange={(checked) => methods.setValue("enableEnrollment", !!checked, { shouldDirty: true })}
-                        className="data-[state=checked]:bg-emerald-500"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900">Require approval</p>
-                        <p className="text-xs text-zinc-500">Mark the course as approval-based before access is granted.</p>
-                      </div>
-                      <Switch
-                        checked={methods.watch("requireApproval") ?? false}
-                        onCheckedChange={(checked) => methods.setValue("requireApproval", !!checked, { shouldDirty: true })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900">Social sharing</p>
-                        <p className="text-xs text-zinc-500">Enable social sharing treatment for this course.</p>
-                      </div>
-                      <Switch
-                        checked={methods.watch("socialSharing") ?? false}
-                        onCheckedChange={(checked) => methods.setValue("socialSharing", !!checked, { shouldDirty: true })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900">Featured course</p>
-                        <p className="text-xs text-zinc-500">Show this course in featured sections on the public site.</p>
-                      </div>
-                      <Switch
-                        checked={methods.watch("featured") ?? false}
-                        onCheckedChange={(checked) => methods.setValue("featured", !!checked, { shouldDirty: true })}
-                        className="data-[state=checked]:bg-gold"
-                      />
-                    </div>
-                  </div>
-
-                  {methods.watch("featured") ? (
-                    <FormField name="featuredOrder" label="Featured order">
-                      {({ id, error, ...rest }) => (
-                        <FormInput
-                          id={id}
-                          error={error}
-                          type="number"
-                          min="0"
-                          step="1"
-                          placeholder="0"
-                          className="rounded-xl border-zinc-200"
-                          {...rest}
-                        />
-                      )}
-                    </FormField>
-                  ) : null}
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900">Related courses</p>
-                        <p className="text-xs text-zinc-500">
-                          Select the courses to recommend on this course&apos;s details page.
-                        </p>
-                      </div>
-                      <span className="text-xs font-medium text-zinc-500">
-                        {selectedRelatedCourseIds.length} selected
-                      </span>
-                    </div>
-
-                    {relatedCourseOptions.length > 0 ? (
-                      <div className="max-h-60 space-y-2 overflow-auto rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
-                        {relatedCourseOptions.map((courseOption) => (
-                          <label
-                            key={courseOption.id}
-                            className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent bg-white p-3 transition hover:border-zinc-200"
-                          >
-                            <Checkbox
-                              checked={selectedRelatedCourseIds.includes(courseOption.id)}
-                              onCheckedChange={(checked) => toggleRelatedCourse(courseOption.id, !!checked)}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-zinc-900">
-                                {courseOption.title}
-                              </p>
-                              <p className="text-xs text-zinc-500">
-                                {courseOption.tag} {courseOption.status ? `· ${courseOption.status}` : ""}
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
-                        Create more courses first, then you can link them here as related courses.
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-zinc-500">
-                  Tip: Keep the description short, clear, and exam-focused.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl border-zinc-200"
-                    onClick={() => {
-                      methods.reset();
-                      setCurriculumSections([]);
-                      setSelectedRelatedCourseIds([]);
-                      setReviewMediaItems([]);
-                      router.push("/admin/courses");
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                    Discard
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl border-zinc-200"
-                    onClick={() => setStep(2)}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
-                  >
-                    <Check className="h-4 w-4" />
-                    {editId ? "Save changes" : "Create course"}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-zinc-900">
-                    Course Curriculum & Structure
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-600">
-                    Build your course structure with modules, lectures, and resources.
-                  </p>
-                </div>
-
-                <input
-                  ref={materialFileRef}
-                  type="file"
-                  accept=".pdf,.docx,.doc,.txt"
-                  className="hidden"
-                  onChange={handleMaterialUpload}
-                />
-
-                <div className="space-y-4">
-                  {curriculumSections.map((section) => {
-                    const lectureCount = section.items.filter((i) => i.type === "lecture").length;
-                    const isSectionExpanded = expandedSectionId === section.id;
-                    return (
-                      <Card
-                        key={section.id}
-                        className="overflow-hidden rounded-xl border-zinc-200 bg-zinc-50/80 shadow-sm"
-                      >
-                        <div className="flex items-center gap-3 p-4">
-                          <span className="cursor-grab text-zinc-400" aria-hidden>
-                            <GripVertical className="h-5 w-5" />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <input
-                              type="text"
-                              value={section.title}
-                              onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                              className="w-full bg-transparent text-base font-semibold text-zinc-900 outline-none placeholder:text-zinc-500"
-                              placeholder="Section title"
-                            />
-                            <p className="mt-0.5 text-sm text-zinc-500">
-                              {lectureCount} lecture{lectureCount !== 1 ? "s" : ""}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-zinc-600 hover:text-zinc-900"
-                              onClick={() => toggleSectionExpanded(section.id)}
-                            >
-                              {isSectionExpanded ? (
-                                <>
-                                  Close <ChevronUp className="ml-1 h-4 w-4" />
-                                </>
-                              ) : (
-                                <>
-                                  Edit <ChevronDown className="ml-1 h-4 w-4" />
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-zinc-500 hover:text-destructive"
-                              onClick={() => removeSection(section.id)}
-                              aria-label="Delete section"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-zinc-700 shadow-sm">
+                          <UploadCloud className="h-5 w-5" />
                         </div>
+                        <div className="text-sm font-semibold text-zinc-900">Click to upload</div>
+                        <div className="text-xs text-zinc-500">
+                          or drag & drop (PNG/JPG/GIF, max 5MB)
+                        </div>
+                        {coverUploading ? (
+                          <div className="text-xs text-amber-600">Uploading…</div>
+                        ) : null}
+                      </div>
 
-                        {isSectionExpanded && (
-                          <div className="border-t border-zinc-200 bg-white px-4 pb-4 pt-4">
-                            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                              Section Description
-                            </label>
-                            <textarea
-                              value={section.description}
-                              onChange={(e) => updateSection(section.id, { description: e.target.value })}
-                              placeholder="Section Description"
-                              rows={3}
-                              className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            />
+                      {coverError ? <p className="text-sm text-destructive">{coverError}</p> : null}
 
-                            <ul className="mt-4 space-y-2">
-                              {section.items.map((item) => {
-                                if (item.type === "lecture") {
-                                  const isLectureExpanded = expandedLectureIds.has(item.id);
-                                  return (
-                                    <li
-                                      key={item.id}
-                                      className="rounded-lg border border-zinc-200 bg-zinc-50/50 overflow-hidden"
-                                    >
-                                      <div className="flex items-center gap-3 p-3">
-                                        <span className="cursor-grab text-zinc-400" aria-hidden>
-                                          <GripVertical className="h-4 w-4" />
-                                        </span>
-                                        <Video className="h-4 w-4 shrink-0 text-zinc-500" />
-                                        <input
-                                          type="text"
-                                          value={item.title}
-                                          onChange={(e) =>
-                                            updateLecture(section.id, item.id, { title: e.target.value })
-                                          }
-                                          className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 font-medium text-zinc-900 outline-none focus:border-zinc-300 focus:bg-white"
-                                        />
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-zinc-600 hover:text-zinc-900"
-                                          onClick={() => toggleLectureExpanded(item.id)}
-                                        >
-                                          {isLectureExpanded ? (
-                                            <>Close <ChevronUp className="ml-1 h-3 w-3" /></>
-                                          ) : (
-                                            <>Edit <ChevronDown className="ml-1 h-3 w-3" /></>
-                                          )}
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-zinc-500 hover:text-destructive"
-                                          onClick={() => removeItem(section.id, item.id)}
-                                          aria-label="Delete lecture"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                      {isLectureExpanded && (
-                                        <div className="border-t border-zinc-200 bg-white p-4 space-y-4">
-                                          <div>
-                                            <label className="mb-1.5 block text-sm font-medium text-zinc-900">
-                                              Video URL
-                                            </label>
-                                            <input
-                                              type="url"
-                                              value={item.videoUrl}
-                                              onChange={(e) =>
-                                                updateLecture(section.id, item.id, { videoUrl: e.target.value })
-                                              }
-                                              placeholder="https://www.youtube.com/watch?v=…"
-                                              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="mb-1.5 block text-sm font-medium text-zinc-900">
-                                              Material URL
-                                            </label>
-                                            <div className="flex gap-2">
-                                              <div className="relative flex-1">
-                                                <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                                                <input
-                                                  type="url"
-                                                  value={item.materialUrl}
-                                                  onChange={(e) =>
-                                                    updateLecture(section.id, item.id, {
-                                                      materialUrl: e.target.value,
-                                                      materialFileName: undefined,
-                                                      materialDataUrl: undefined,
-                                                    })
-                                                  }
-                                                  placeholder="Enter Material url"
-                                                  className="w-full rounded-lg border border-zinc-200 py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                                                />
-                                              </div>
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="shrink-0 rounded-lg border-zinc-200"
-                                                onClick={() => triggerMaterialUpload(item.id)}
-                                              >
-                                                <UploadCloud className="mr-1.5 h-4 w-4" />
-                                                Upload File
-                                              </Button>
-                                            </div>
-                                            <p className="mt-1 text-xs text-zinc-500">
-                                              Upload file pdf, docx, txt
-                                              {item.materialFileName && (
-                                                <span className="ml-1 font-medium text-zinc-700">
-                                                  · Uploaded: {item.materialFileName}
-                                                </span>
-                                              )}
-                                            </p>
-                                          </div>
-                                          <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
-                                            <div>
-                                              <p className="text-sm font-medium text-zinc-900">Free Lecture</p>
-                                              <p className="text-xs text-zinc-500">
-                                                Allow students to view this lecture without enrolling in the course.
-                                              </p>
-                                            </div>
-                                            <Switch
-                                              checked={item.freeLecture}
-                                              onCheckedChange={(checked) =>
-                                                updateLecture(section.id, item.id, { freeLecture: !!checked })
-                                              }
-                                              className="data-[state=checked]:bg-emerald-500"
-                                            />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </li>
-                                  );
+                      <FormField name="imageUrl" label="Course Cover URL">
+                        {({ id, error, ...rest }) => (
+                          <FormInput
+                            id={id}
+                            error={error}
+                            placeholder="https://example.com/course-cover.jpg"
+                            className="rounded-xl border-zinc-200"
+                            {...rest}
+                          />
+                        )}
+                      </FormField>
+
+                      <FormField name="videoPreviewUrl" label="Course Video Preview URL">
+                        {({ id, error, ...rest }) => (
+                          <FormInput
+                            id={id}
+                            error={error}
+                            placeholder="https://www.youtube.com/watch?v=…"
+                            className="rounded-xl border-zinc-200"
+                            {...rest}
+                          />
+                        )}
+                      </FormField>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Search className="h-4 w-4 text-emerald-600" />
+                        SEO Settings
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-0">
+                      <FormField name="seoTitle" label="SEO Title">
+                        {({ id, ...rest }) => {
+                          const value = methods.watch("seoTitle") ?? "";
+                          return (
+                            <div className="space-y-1.5">
+                              <FormInput
+                                id={id}
+                                placeholder="Enter SEO title (50-60 characters recommended)"
+                                className="rounded-xl border-zinc-200 bg-zinc-50/50"
+                                maxLength={60}
+                                {...rest}
+                              />
+                              <p className="text-xs text-zinc-500">{value.length}/60 characters</p>
+                            </div>
+                          );
+                        }}
+                      </FormField>
+
+                      <FormField name="seoDescription" label="SEO Description">
+                        {({ id, ...rest }) => {
+                          const value = methods.watch("seoDescription") ?? "";
+                          return (
+                            <div className="space-y-1.5">
+                              <textarea
+                                id={id}
+                                placeholder="Enter SEO meta description (150-160 characters recommended)"
+                                rows={4}
+                                className="w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                maxLength={160}
+                                {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+                              />
+                              <p className="text-xs text-zinc-500">{value.length}/160 characters</p>
+                            </div>
+                          );
+                        }}
+                      </FormField>
+
+                      <div className="space-y-1.5">
+                        <div className="flex gap-2">
+                          <FormField name="seoKeywords" label="SEO Keywords">
+                            {({ id }) => {
+                              const keywordsStr = methods.watch("seoKeywords") ?? "";
+                              const keywords = keywordsStr
+                                ? keywordsStr
+                                    .split(",")
+                                    .map((k) => k.trim())
+                                    .filter(Boolean)
+                                : [];
+                              const addKeyword = () => {
+                                const trimmed = seoKeywordInput.trim();
+                                if (trimmed) {
+                                  const next = keywords.includes(trimmed)
+                                    ? keywords
+                                    : [...keywords, trimmed];
+                                  methods.setValue("seoKeywords", next.join(", "), {
+                                    shouldDirty: true,
+                                  });
+                                  setSeoKeywordInput("");
                                 }
-                                return (
-                                  <li
-                                    key={item.id}
-                                    className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 p-3"
+                              };
+                              return (
+                                <>
+                                  <input
+                                    id={id}
+                                    type="text"
+                                    value={seoKeywordInput}
+                                    onChange={(e) => setSeoKeywordInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addKeyword();
+                                      }
+                                    }}
+                                    placeholder="Enter a keyword"
+                                    className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 shrink-0 rounded-xl border-zinc-200"
+                                    onClick={addKeyword}
+                                    aria-label="Add keyword"
                                   >
-                                    <span className="cursor-grab text-zinc-400" aria-hidden>
-                                      <GripVertical className="h-4 w-4" />
-                                    </span>
-                                    <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" />
-                                    <input
-                                      type="text"
-                                      value={item.title}
-                                      onChange={(e) => updateQuiz(section.id, item.id, { title: e.target.value })}
-                                      className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-zinc-900 outline-none focus:border-zinc-300 focus:bg-white"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-zinc-500 hover:text-destructive"
-                                      onClick={() => removeItem(section.id, item.id)}
-                                      aria-label="Delete quiz"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-
-                            <div className="mt-4 flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl border-zinc-200"
-                                onClick={() => addLecture(section.id)}
-                              >
-                                <Video className="mr-1.5 h-4 w-4" />
-                                Add Lecture
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl border-zinc-200"
-                                onClick={() => addQuiz(section.id)}
-                              >
-                                <FileQuestion className="mr-1.5 h-4 w-4" />
-                                Add Quiz
-                              </Button>
-                            </div>
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              );
+                            }}
+                          </FormField>
+                        </div>
+                        {methods.watch("seoKeywords") && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {(methods.watch("seoKeywords") ?? "")
+                              .split(",")
+                              .map((k) => k.trim())
+                              .filter(Boolean)
+                              .map((keyword) => (
+                                <span
+                                  key={keyword}
+                                  className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700"
+                                >
+                                  {keyword}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const current = (methods.getValues("seoKeywords") ?? "")
+                                        .split(",")
+                                        .map((k) => k.trim())
+                                        .filter(Boolean);
+                                      methods.setValue(
+                                        "seoKeywords",
+                                        current.filter((k) => k !== keyword).join(", "),
+                                        { shouldDirty: true }
+                                      );
+                                    }}
+                                    className="rounded p-0.5 hover:bg-zinc-200"
+                                    aria-label={`Remove ${keyword}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
                           </div>
                         )}
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full rounded-xl border-dashed border-zinc-300 py-6 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900"
-                  onClick={addSection}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Section
-                </Button>
-
-                <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Student review media</CardTitle>
-                    <CardDescription>
-                      Add image, video, or YouTube review items for the public course page gallery.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-0">
-                    {reviewMediaItems.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-500">
-                        No review media added yet.
                       </div>
-                    ) : null}
-
-                    {reviewMediaItems.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-zinc-900">
-                              Media item {index + 1}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              Add a hosted image/video URL or a YouTube link.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-zinc-500 hover:text-destructive"
-                            onClick={() => removeReviewMediaItem(item.id)}
-                            aria-label="Remove review media item"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-zinc-700">Type</label>
-                            <select
-                              value={item.kind}
-                              onChange={(e) =>
-                                updateReviewMediaItem(item.id, {
-                                  kind: e.target.value as ReviewMediaFormItem["kind"],
-                                })
-                              }
-                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            >
-                              <option value="youtube">YouTube</option>
-                              <option value="video">Video</option>
-                              <option value="image">Image</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-zinc-700">Source URL</label>
-                            <input
-                              type="url"
-                              value={item.src}
-                              onChange={(e) => updateReviewMediaItem(item.id, { src: e.target.value })}
-                              placeholder={
-                                item.kind === "youtube"
-                                  ? "https://www.youtube.com/watch?v=..."
-                                  : "https://example.com/media-file"
-                              }
-                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-zinc-700">Caption</label>
-                            <input
-                              type="text"
-                              value={item.caption}
-                              onChange={(e) => updateReviewMediaItem(item.id, { caption: e.target.value })}
-                              placeholder="Optional caption"
-                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-zinc-700">Poster URL</label>
-                            <input
-                              type="url"
-                              value={item.poster}
-                              onChange={(e) => updateReviewMediaItem(item.id, { poster: e.target.value })}
-                              placeholder="Optional poster / thumbnail URL"
-                              className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full rounded-xl border-dashed border-zinc-300 py-5 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-900"
-                      onClick={addReviewMediaItem}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Review Media
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-zinc-500">
-                  Step 2: Define your course structure and lessons.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl border-zinc-200"
-                    onClick={() => setStep(1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
-                  >
-                    <Check className="h-4 w-4" />
-                    {editId ? "Save changes" : "Create course"}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </form>
-
-        {/* Right column: Course Cover on step 1, SEO Settings on step 2 */}
-        <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
-          {step === 1 && (
-            <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Course Cover</CardTitle>
-                <CardDescription>
-                  Upload an image or paste a URL. Recommended: 1200×630px.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-0">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void setCoverFromFile(f);
-                    e.currentTarget.value = "";
-                  }}
-                />
-
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => fileRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") fileRef.current?.click();
-                  }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const f = e.dataTransfer.files?.[0];
-                    if (f) void setCoverFromFile(f);
-                  }}
-                  className="flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-4 text-center"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-zinc-700 shadow-sm">
-                    <UploadCloud className="h-5 w-5" />
-                  </div>
-                  <div className="text-sm font-semibold text-zinc-900">Click to upload</div>
-                  <div className="text-xs text-zinc-500">or drag & drop (PNG/JPG/GIF, max 5MB)</div>
-                  {coverUploading ? <div className="text-xs text-amber-600">Uploading…</div> : null}
-                </div>
-
-                {coverError ? <p className="text-sm text-destructive">{coverError}</p> : null}
-
-                <FormField name="imageUrl" label="Course Cover URL">
-                  {({ id, error, ...rest }) => (
-                    <FormInput
-                      id={id}
-                      error={error}
-                      placeholder="https://example.com/course-cover.jpg"
-                      className="rounded-xl border-zinc-200"
-                      {...rest}
-                    />
-                  )}
-                </FormField>
-
-                <FormField name="videoPreviewUrl" label="Course Video Preview URL">
-                  {({ id, error, ...rest }) => (
-                    <FormInput
-                      id={id}
-                      error={error}
-                      placeholder="https://www.youtube.com/watch?v=…"
-                      className="rounded-xl border-zinc-200"
-                      {...rest}
-                    />
-                  )}
-                </FormField>
-              </CardContent>
-            </Card>
-          )}
-
-          {step === 2 && (
-            <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Search className="h-4 w-4 text-emerald-600" />
-                  SEO Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-4">
-                <FormField name="seoTitle" label="SEO Title">
-                  {({ id, ...rest }) => {
-                    const value = methods.watch("seoTitle") ?? "";
-                    return (
-                      <div className="space-y-1.5">
-                        <FormInput
-                          id={id}
-                          placeholder="Enter SEO title (50-60 characters recommended)"
-                          className="rounded-xl border-zinc-200 bg-zinc-50/50"
-                          maxLength={60}
-                          {...rest}
-                        />
-                        <p className="text-xs text-zinc-500">{value.length}/60 characters</p>
-                      </div>
-                    );
-                  }}
-                </FormField>
-
-                <FormField name="seoDescription" label="SEO Description">
-                  {({ id, ...rest }) => {
-                    const value = methods.watch("seoDescription") ?? "";
-                    return (
-                      <div className="space-y-1.5">
-                        <textarea
-                          id={id}
-                          placeholder="Enter SEO meta description (150-160 characters recommended)"
-                          rows={4}
-                          className="w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                          maxLength={160}
-                          {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-                        />
-                        <p className="text-xs text-zinc-500">{value.length}/160 characters</p>
-                      </div>
-                    );
-                  }}
-                </FormField>
-
-                <div className="space-y-1.5">
-                  <div className="flex gap-2">
-                    <FormField name="seoKeywords" label="SEO Keywords">
-                      {({ id }) => {
-                        const keywordsStr = methods.watch("seoKeywords") ?? "";
-                        const keywords = keywordsStr ? keywordsStr.split(",").map((k) => k.trim()).filter(Boolean) : [];
-                        const addKeyword = () => {
-                          const trimmed = seoKeywordInput.trim();
-                          if (trimmed) {
-                            const next = keywords.includes(trimmed) ? keywords : [...keywords, trimmed];
-                            methods.setValue("seoKeywords", next.join(", "), { shouldDirty: true });
-                            setSeoKeywordInput("");
-                          }
-                        };
-                        return (
-                          <>
-                            <input
-                              id={id}
-                              type="text"
-                              value={seoKeywordInput}
-                              onChange={(e) => setSeoKeywordInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  addKeyword();
-                                }
-                              }}
-                              placeholder="Enter a keyword"
-                              className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9 shrink-0 rounded-xl border-zinc-200"
-                              onClick={addKeyword}
-                              aria-label="Add keyword"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </>
-                        );
-                      }}
-                    </FormField>
-                  </div>
-                  {methods.watch("seoKeywords") && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {(methods.watch("seoKeywords") ?? "")
-                        .split(",")
-                        .map((k) => k.trim())
-                        .filter(Boolean)
-                        .map((keyword) => (
-                          <span
-                            key={keyword}
-                            className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700"
-                          >
-                            {keyword}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const current = (methods.getValues("seoKeywords") ?? "").split(",").map((k) => k.trim()).filter(Boolean);
-                                methods.setValue(
-                                  "seoKeywords",
-                                  current.filter((k) => k !== keyword).join(", "),
-                                  { shouldDirty: true }
-                                );
-                              }}
-                              className="rounded p-0.5 hover:bg-zinc-200"
-                              aria-label={`Remove ${keyword}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </aside>
-        </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </aside>
+          </div>
         )}
       </div>
     </FormProvider>

@@ -13,6 +13,9 @@ export class StudentFieldOptions {
 
   @Prop({ type: [String], default: [] })
   categories!: string[];
+
+  @Prop({ type: [String], default: [] })
+  quizCategories!: string[];
 }
 
 export const StudentFieldOptionsSchema = SchemaFactory.createForClass(StudentFieldOptions);

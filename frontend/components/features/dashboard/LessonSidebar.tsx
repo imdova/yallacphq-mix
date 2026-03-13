@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Circle, Lock, Trophy, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,17 @@ export function LessonSidebar({
   variant?: "sidebar" | "sheet";
   onNavigate?: () => void;
 }) {
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("course");
+  const quizParam = searchParams.get("quiz");
+  const lessonQuizHref = (moduleId: string) => {
+    const base = "/dashboard/courses/lesson";
+    const params = new URLSearchParams();
+    if (courseId) params.set("course", courseId);
+    params.set("quiz", moduleId);
+    return `${base}?${params.toString()}`;
+  };
+
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({
     m1: false,
     m2: true,
@@ -120,13 +132,14 @@ export function LessonSidebar({
 
                 {mod.quiz ? (
                   <Link
-                    href={mod.quiz.locked ? "#" : `/dashboard/quizzes?module=${encodeURIComponent(mod.id)}`}
+                    href={mod.quiz.locked ? "#" : lessonQuizHref(mod.id)}
                     onClick={mod.quiz.locked ? undefined : onNavigate}
                     className={cn(
                       "mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm",
-                      "text-zinc-600 hover:bg-zinc-50",
+                      quizParam === mod.id ? "bg-gold/15 font-medium text-zinc-900" : "text-zinc-600 hover:bg-zinc-50",
                       mod.quiz.locked && "pointer-events-none opacity-60"
                     )}
+                    aria-current={quizParam === mod.id ? "page" : undefined}
                   >
                     {mod.quiz.locked ? (
                       <Lock className="h-3.5 w-3.5 shrink-0 text-zinc-400" />

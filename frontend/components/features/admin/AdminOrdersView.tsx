@@ -34,6 +34,13 @@ import {
 type StatusFilter = "all" | OrderStatus;
 type ProviderFilter = "all" | Order["provider"];
 
+const PROVIDER_TABS: Array<{ value: ProviderFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "stripe", label: "Paybal" },
+  { value: "paymob", label: "Paymob" },
+  { value: "manual", label: "Bank Transfer" },
+];
+
 function formatCurrency(amount: number, currency: string) {
   const cur = currency?.trim() || "USD";
   return new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(amount);
@@ -43,6 +50,21 @@ function formatDate(iso: string): string {
   try {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function formatDateTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return "—";
   }
@@ -211,7 +233,8 @@ export function AdminOrdersView() {
     () => [
       {
         id: "order",
-        header: "Order",
+        header: "Order ID",
+        meta: { width: "220px" },
         cell: ({ row }) => {
           const o = row.original;
           return (
@@ -223,7 +246,7 @@ export function AdminOrdersView() {
                     setDetailsOrder(o);
                     setDetailsOpen(true);
                   }}
-                  className="font-semibold text-zinc-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-1 rounded"
+                  className="max-w-[160px] truncate font-semibold text-zinc-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-1 rounded"
                 >
                   #{o.id}
                 </button>
@@ -246,8 +269,19 @@ export function AdminOrdersView() {
         },
       },
       {
+        id: "dateTime",
+        header: "Date & Time",
+        meta: { width: "190px" },
+        cell: ({ row }) => (
+          <span className="text-sm text-zinc-600" title={row.original.createdAt}>
+            {formatDateTime(row.original.createdAt)}
+          </span>
+        ),
+      },
+      {
         id: "student",
         header: "Student",
+        meta: { width: "260px" },
         cell: ({ row }) => {
           const o = row.original;
           return (
@@ -264,13 +298,31 @@ export function AdminOrdersView() {
         },
       },
       {
+        id: "country",
+        header: "Country",
+        meta: { width: "140px" },
+        cell: ({ row }) => (
+          <span className="text-sm text-zinc-700">{row.original.studentCountry ?? "—"}</span>
+        ),
+      },
+      {
+        id: "phone",
+        header: "Phone",
+        meta: { width: "160px" },
+        cell: ({ row }) => (
+          <span className="text-sm text-zinc-700">{row.original.studentPhone ?? "—"}</span>
+        ),
+      },
+      {
         accessorKey: "courseTitle",
         header: "Course",
+        meta: { width: "260px" },
         cell: ({ row }) => <span className="text-sm font-medium text-zinc-800">{row.original.courseTitle}</span>,
       },
       {
         id: "amount",
         header: "Amount",
+        meta: { width: "160px", align: "right" },
         cell: ({ row }) => {
           const o = row.original;
           const net = Math.max(0, o.amount - (o.discountAmount ?? 0));
@@ -294,6 +346,7 @@ export function AdminOrdersView() {
       {
         id: "status",
         header: "Status",
+        meta: { width: "150px" },
         cell: ({ row }) => {
           const s = row.original.status;
           const icon =
@@ -321,7 +374,8 @@ export function AdminOrdersView() {
       },
       {
         id: "payment",
-        header: "Payment",
+        header: "Payment method",
+        meta: { width: "180px" },
         cell: ({ row }) => {
           const o = row.original;
           return (
@@ -333,55 +387,10 @@ export function AdminOrdersView() {
         },
       },
       {
-        id: "transaction",
-        header: "Transaction",
-        cell: ({ row }) => {
-          const o = row.original;
-          const tid = o.transactionId?.trim();
-          return (
-            <div className="min-w-0 max-w-[180px]">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-medium text-zinc-800" title={tid || undefined}>
-                  {tid || "—"}
-                </span>
-                {tid ? (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-6 w-6 shrink-0 rounded border-zinc-200"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void copyText(tid);
-                    }}
-                    aria-label="Copy transaction ID"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                ) : null}
-              </div>
-              {o.paidAt ? (
-                <div className="text-xs text-zinc-500 mt-0.5" title={o.paidAt}>
-                  Paid {formatDate(o.paidAt)}
-                </div>
-              ) : null}
-            </div>
-          );
-        },
-      },
-      {
-        id: "date",
-        header: "Date",
-        cell: ({ row }) => (
-          <span className="text-sm text-zinc-600" title={row.original.createdAt}>
-            {formatDate(row.original.createdAt)}
-          </span>
-        ),
-      },
-      {
         id: "actions",
-        header: "",
+        header: <span className="sr-only">Actions</span>,
         enableSorting: false,
+        meta: { width: "140px", align: "right" },
         cell: ({ row }) => {
           const o = row.original;
           const canRefund = o.status === "paid";
@@ -449,41 +458,41 @@ export function AdminOrdersView() {
         </Card>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-zinc-800 bg-black shadow-sm">
           <CardContent className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Revenue (paid)
             </div>
-            <div className="mt-2 text-2xl font-bold text-zinc-900">{formatCurrency(stats.revenue, "USD")}</div>
-            <div className="mt-1 text-xs text-zinc-500">AOV {formatCurrency(stats.aov, "USD")}</div>
+            <div className="mt-2 text-2xl font-bold text-white">{formatCurrency(stats.revenue, "USD")}</div>
+            <div className="mt-1 text-xs text-zinc-400">AOV {formatCurrency(stats.aov, "USD")}</div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-zinc-800 bg-black shadow-sm">
           <CardContent className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Paid</div>
-            <div className="mt-2 text-2xl font-bold text-zinc-900">{stats.paid}</div>
-            <div className="mt-1 text-xs text-zinc-500">{stats.pending} pending · {stats.failed} failed</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Paid</div>
+            <div className="mt-2 text-2xl font-bold text-white">{stats.paid}</div>
+            <div className="mt-1 text-xs text-zinc-400">{stats.pending} pending · {stats.failed} failed</div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-zinc-800 bg-black shadow-sm">
           <CardContent className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Refunded</div>
-            <div className="mt-2 text-2xl font-bold text-zinc-900">{stats.refunded}</div>
-            <div className="mt-1 text-xs text-zinc-500">Refunds processed</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Refunded</div>
+            <div className="mt-2 text-2xl font-bold text-white">{stats.refunded}</div>
+            <div className="mt-1 text-xs text-zinc-400">Refunds processed</div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border-zinc-800 bg-black shadow-sm">
           <CardContent className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Orders</div>
-            <div className="mt-2 text-2xl font-bold text-zinc-900">{stats.total}</div>
-            <div className="mt-1 text-xs text-zinc-500">Within selected filters</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Orders</div>
+            <div className="mt-2 text-2xl font-bold text-white">{stats.total}</div>
+            <div className="mt-1 text-xs text-zinc-400">Within selected filters</div>
           </CardContent>
         </Card>
       </div>
 
       <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
         <CardContent className="space-y-4 pt-6">
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_180px_auto] sm:items-end">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_180px_180px_auto] sm:items-end">
             <div className="space-y-1">
               <div className="text-xs font-semibold text-zinc-600">Search</div>
               <div className="relative">
@@ -509,21 +518,6 @@ export function AdminOrdersView() {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
                   <SelectItem value="refunded">Refunded</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-xs font-semibold text-zinc-600">Provider</div>
-              <Select value={provider} onValueChange={(v) => setProvider(v as ProviderFilter)}>
-                <SelectTrigger className="h-10 rounded-xl border-zinc-200 bg-white">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="paymob">Paymob</SelectItem>
-                  <SelectItem value="stripe">Stripe</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -579,6 +573,27 @@ export function AdminOrdersView() {
                 Refresh
               </Button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {PROVIDER_TABS.map((tab) => {
+              const isActive = provider === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setProvider(tab.value)}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-gold text-gold-foreground shadow-sm hover:bg-gold/90"
+                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {loading ? (
@@ -770,13 +785,14 @@ export function AdminOrdersView() {
               </div>
 
               <div className="hidden xl:block overflow-x-auto -mx-4 sm:mx-0">
-                <div className="min-w-[980px] px-4 sm:px-0">
+                <div className="min-w-[1540px] px-4 sm:px-0">
                   <DataTable
                     columns={columns}
                     data={filtered}
                     pageSize={10}
                     enableRowSelection={false}
                     emptyMessage="No orders found."
+                    tableLayout="fixed"
                     className="[&_.rounded-md.border]:rounded-2xl [&_.rounded-md.border]:border-zinc-200 [&_thead]:bg-zinc-50/70"
                   />
                 </div>

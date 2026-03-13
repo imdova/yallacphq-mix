@@ -3,7 +3,21 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Plus, Search, Ticket, Users, GraduationCap, LogOut, ShoppingBag } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  ChevronDown,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+  ShoppingBag,
+  Ticket,
+  User,
+  Users,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,18 +37,21 @@ const titleMap: Record<string, { title: string; subtitle?: string }> = {
   "/admin": { title: "Dashboard", subtitle: "KPIs, activity, and quick actions" },
   "/admin/students": { title: "Students", subtitle: "Manage students and roles" },
   "/admin/courses": { title: "Courses", subtitle: "Catalog, pricing, and publishing" },
-  "/admin/courses/new": { title: "New course", subtitle: "Create course in 2 steps" },
+  "/admin/courses/new": { title: "", subtitle: "" },
   "/admin/orders": { title: "Orders", subtitle: "Payments and checkout activity" },
   "/admin/promo-codes": { title: "Promo codes", subtitle: "Discount codes and limits" },
   "/admin/offers": { title: "Offers", subtitle: "Landing pages and promotions" },
   "/admin/webinars": { title: "Webinars", subtitle: "Sessions, registrations, reminders" },
-  "/admin/settings": { title: "Settings", subtitle: "Security, integrations, preferences" },
+  "/admin/site-settings": { title: "Site settings", subtitle: "Site-wide options and preferences" },
+  "/admin/settings": { title: "LMS Setting", subtitle: "Security, integrations, preferences" },
 };
 
 export function AdminHeader() {
   const pathname = usePathname() ?? "/admin";
   const router = useRouter();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Admin";
+  const initial = displayName.charAt(0).toUpperCase();
   const [q, setQ] = React.useState("");
   const [debouncedQ, setDebouncedQ] = React.useState("");
   const [results, setResults] = React.useState<{ students: User[]; courses: Course[]; orders: Order[] } | null>(null);
@@ -109,10 +126,21 @@ export function AdminHeader() {
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur">
       <div className="flex h-14 items-center justify-between gap-4 px-4 md:px-6">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-zinc-900">{meta.title}</div>
-          {meta.subtitle ? (
-            <div className="truncate text-xs text-zinc-500">{meta.subtitle}</div>
-          ) : null}
+          {pathname === "/admin/courses/new" ? (
+            <Button asChild variant="outline" size="sm" className="h-9 rounded-xl border-zinc-200">
+              <Link href="/admin/courses">
+                <ArrowLeft className="h-4 w-4" />
+                Back to courses
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <div className="truncate text-sm font-semibold text-zinc-900">{meta.title}</div>
+              {meta.subtitle ? (
+                <div className="truncate text-xs text-zinc-500">{meta.subtitle}</div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="hidden max-w-md flex-1 lg:block" ref={searchRef}>
@@ -251,22 +279,69 @@ export function AdminHeader() {
 
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
           </button>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-xl border-zinc-200"
-            onClick={() => void handleLogout()}
-          >
-            <LogOut className="h-4 w-4 mr-1.5" />
-            Log out
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-white pl-1.5 pr-2.5 py-1.5 min-w-0 hover:bg-zinc-50 hover:border-zinc-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2"
+                aria-label="My account"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-200 text-sm font-semibold text-zinc-600">
+                  {user?.profileImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.profileImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initial
+                  )}
+                </span>
+                <span className="truncate max-w-[120px] text-sm font-medium text-zinc-900">
+                  {displayName}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl border-zinc-200 p-2 shadow-lg">
+              <div className="px-2 py-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">My Account</p>
+              </div>
+              <DropdownMenuItem asChild>
+                <Link href="/admin" className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900">
+                  <LayoutDashboard className="h-4 w-4 shrink-0 text-zinc-500" />
+                  Dashboard
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900">
+                  <User className="h-4 w-4 shrink-0 text-zinc-500" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900">
+                  <Settings className="h-4 w-4 shrink-0 text-zinc-500" />
+                  LMS Setting
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-zinc-100" />
+              <DropdownMenuItem
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-zinc-700 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
+                onSelect={() => void handleLogout()}
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

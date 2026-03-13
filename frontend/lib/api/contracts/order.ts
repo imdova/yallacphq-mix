@@ -10,6 +10,7 @@ export const orderSchema = z.object({
   studentName: z.string(),
   studentEmail: z.string().email(),
   studentPhone: z.string().optional(),
+  studentCountry: z.string().optional(),
   courseTitle: z.string(),
   currency: z.string(),
   amount: z.number(),

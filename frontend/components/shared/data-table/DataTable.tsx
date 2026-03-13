@@ -35,6 +35,7 @@ export interface DataTableProps<TData, TValue> {
   enableRowSelection?: boolean;
   enableSorting?: boolean;
   enablePagination?: boolean;
+  tableLayout?: "auto" | "fixed";
   className?: string;
 }
 
@@ -48,6 +49,7 @@ export function DataTable<TData, TValue>({
   enableRowSelection = true,
   enableSorting = true,
   enablePagination = true,
+  tableLayout = "auto",
   className,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -90,36 +92,75 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <div className="rounded-md border">
-        <table className="w-full caption-bottom text-sm">
-          <thead className="[&_tr]:border-b">
+      <div className="rounded-md border overflow-hidden bg-white">
+        <table
+          className={cn(
+            "w-full min-w-0 caption-bottom text-sm",
+            tableLayout === "fixed" ? "table-fixed" : "table-auto"
+          )}
+        >
+          <thead className="bg-zinc-50/70">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50">
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="h-10 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0"
-                  >
-                    <div className="flex items-center gap-2">
-                      {header.column.getCanSort() ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground"
-                          onClick={() => header.column.toggleSorting(header.column.getIsSorted() === "asc")}
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {header.column.getIsSorted() === "asc" ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : header.column.getIsSorted() === "desc" ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : null}
-                        </button>
-                      ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
+              <tr key={headerGroup.id} className="border-b border-zinc-200">
+                {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta as
+                    | {
+                        width?: string;
+                        align?: "left" | "center" | "right";
+                        headerClassName?: string;
+                        cellClassName?: string;
+                      }
+                    | undefined;
+                  const align = meta?.align ?? "left";
+                  const alignText =
+                    align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+                  const alignJustify =
+                    align === "right"
+                      ? "justify-end"
+                      : align === "center"
+                        ? "justify-center"
+                        : "justify-start";
+
+                  return (
+                    <th
+                      key={header.id}
+                      className={cn(
+                        "px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wider text-zinc-500",
+                        "whitespace-nowrap",
+                        "overflow-hidden",
+                        alignText,
+                        meta?.headerClassName,
+                        "[&:has([role=checkbox])]:pr-0"
                       )}
-                    </div>
-                  </th>
-                ))}
+                      style={meta?.width ? { width: meta.width } : undefined}
+                    >
+                      <div className={cn("flex min-w-0 items-center gap-2", alignJustify)}>
+                        {header.column.getCanSort() ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              "flex min-w-0 items-center gap-1 text-left",
+                              "text-zinc-600 hover:text-zinc-900",
+                              align === "right" && "ml-auto"
+                            )}
+                            onClick={() =>
+                              header.column.toggleSorting(header.column.getIsSorted() === "asc")
+                            }
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-zinc-400" />
+                            ) : header.column.getIsSorted() === "desc" ? (
+                              <ChevronDown className="h-4 w-4 text-zinc-400" />
+                            ) : null}
+                          </button>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             ))}
           </thead>
@@ -129,18 +170,49 @@ export function DataTable<TData, TValue>({
                 <tr
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                  className={cn(
+                    "border-b border-zinc-100 bg-white transition-colors",
+                    "hover:bg-zinc-50/50",
+                    "data-[state=selected]:bg-zinc-50"
+                  )}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta as
+                      | {
+                          width?: string;
+                          align?: "left" | "center" | "right";
+                          headerClassName?: string;
+                          cellClassName?: string;
+                        }
+                      | undefined;
+                    const align = meta?.align ?? "left";
+                    const alignText =
+                      align === "right"
+                        ? "text-right"
+                        : align === "center"
+                          ? "text-center"
+                          : "text-left";
+                    return (
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          "px-4 py-3 align-middle text-sm text-zinc-700",
+                          "overflow-hidden",
+                          alignText,
+                          meta?.cellClassName,
+                          "[&:has([role=checkbox])]:pr-0"
+                        )}
+                        style={meta?.width ? { width: meta.width } : undefined}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                <td colSpan={columns.length} className="h-24 text-center text-sm text-zinc-500">
                   {emptyMessage}
                 </td>
               </tr>

@@ -1,34 +1,49 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { STUDENT_NAV_ITEMS } from "@/components/features/dashboard/student-nav-config";
-import { STUDENT_SIDEBAR_BRANDING } from "@/constants";
-import { Lightbulb } from "lucide-react";
 
-export function StudentSidebar() {
+export function StudentSidebar({
+  variant = "sidebar",
+  onNavigate,
+}: {
+  variant?: "sidebar" | "sheet";
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-white">
-      <div className="flex h-16 items-center gap-2 border-b border-zinc-800 px-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gold text-gold-foreground">
-          <Lightbulb className="h-5 w-5" />
-        </span>
-        <div className="flex flex-col">
-          <span className="font-semibold tracking-tight">{STUDENT_SIDEBAR_BRANDING.title}</span>
-          <span className="text-xs uppercase tracking-wider text-zinc-400">
-            {STUDENT_SIDEBAR_BRANDING.subtitle}
-          </span>
-        </div>
+    <aside
+      className={cn(
+        "flex shrink-0 flex-col bg-zinc-900 text-white",
+        variant === "sidebar" ? "w-56 border-r border-zinc-800" : "w-full"
+      )}
+    >
+      <div className="flex h-20 items-center justify-center border-b border-zinc-800 px-3 py-3">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="flex w-full items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 focus:ring-offset-zinc-900"
+        >
+          <Image
+            src="/brand/logo-sidebar.png"
+            alt="Yalla CPHQ - think quality. lead change"
+            width={180}
+            height={56}
+            className="h-auto w-full max-w-[180px] object-contain"
+            priority
+          />
+        </Link>
       </div>
       <nav className="flex-1 space-y-0.5 p-3" aria-label="Main">
         {STUDENT_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive =
             pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
-            <Link key={href} href={href}>
+            <Link key={href} href={href} onClick={onNavigate}>
               <span
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -47,6 +62,7 @@ export function StudentSidebar() {
       <div className="space-y-3 border-t border-zinc-800 p-3">
         <Link
           href="/dashboard/premium"
+          onClick={onNavigate}
           className="flex w-full items-center justify-center rounded-lg bg-gold px-3 py-2.5 text-sm font-semibold text-gold-foreground hover:bg-gold/90"
         >
           Go Premium
@@ -58,6 +74,7 @@ export function StudentSidebar() {
           <p className="mt-0.5 text-sm text-zinc-500">Facing issues? Contact support</p>
           <Link
             href="/dashboard/support"
+            onClick={onNavigate}
             className="mt-2 flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white"
           >
             Get Support

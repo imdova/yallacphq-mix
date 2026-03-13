@@ -441,7 +441,7 @@ function CompletedSection({
                     variant="outline"
                     className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                   >
-                    <Link href="/dashboard/certifications">Certificate</Link>
+                    <Link href="/dashboard/certifications">My Certificates</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -491,7 +491,7 @@ function CompletedSection({
                       variant="outline"
                       className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                     >
-                      <Link href="/dashboard/certifications">Certificate</Link>
+                      <Link href="/dashboard/certifications">My Certificates</Link>
                     </Button>
                   </div>
                 </div>

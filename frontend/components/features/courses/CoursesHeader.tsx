@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { OFFERS_DROPDOWN_ITEMS, WEBINARS_DROPDOWN_ITEMS, ROUTES } from "@/constants";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/contexts/auth-context";
+import { StudentAccountMenu } from "@/components/features/dashboard/StudentAccountMenu";
 
 const navLinks = [
   { href: "/courses", label: "All Courses" },
@@ -243,12 +244,7 @@ export function CoursesHeader() {
               </Link>
             </div>
           ) : (
-            <Link
-              href={ROUTES.DASHBOARD}
-              className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 md:block"
-            >
-              Dashboard
-            </Link>
+            <StudentAccountMenu />
           )}
         </div>
       </div>

@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/contexts/auth-context";
-import { StudentAccountMenu } from "@/components/features/dashboard/StudentAccountMenu";
+import { Button } from "@/components/ui/button";
 
 export function FreeLectureHeader() {
-  const { user, status } = useAuth();
-  const isLoggedIn = status === "authenticated" && !!user;
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white">
       <div className="container flex h-16 items-center justify-between">
@@ -19,16 +15,14 @@ export function FreeLectureHeader() {
             Yalla CPHQ
           </span>
         </Link>
-        {isLoggedIn ? (
-          <StudentAccountMenu />
-        ) : (
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900"
-          >
-            ← Return to Dashboard
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="h-10 rounded-xl border-zinc-200">
+            <Link href="/offers">More offers</Link>
+          </Button>
+          <Button asChild className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90">
+            <Link href="/offers/cphq-offer">Get full access</Link>
+          </Button>
+        </div>
       </div>
     </header>
   );

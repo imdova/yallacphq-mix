@@ -22,6 +22,7 @@ import { fetchAdminOrders } from "@/lib/dal/orders";
 import { fetchPromoCodes } from "@/lib/dal/promo-codes";
 import { fetchUsers } from "@/lib/dal/user";
 import type { Order } from "@/types/order";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 
 function formatUsd(amount: number) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(amount);
@@ -258,7 +259,7 @@ export function AdminOverviewView() {
                             {o.courseTitle}
                           </p>
                           <p className="mt-0.5 truncate text-xs text-zinc-400">
-                            {o.studentEmail} · <span className="font-mono">{o.id}</span>
+                            {o.studentEmail} · <span className="font-mono">{getOrderDisplayId(o)}</span>
                           </p>
                         </div>
                         <div className="shrink-0 text-right">

@@ -4,6 +4,7 @@ export type PaymentProvider = "paymob" | "stripe" | "manual";
 
 export interface Order {
   id: string;
+  publicId?: string;
   studentName: string;
   studentEmail: string;
   studentPhone?: string;

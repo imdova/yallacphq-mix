@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getAdminOrders, updateOrderStatus } from "@/lib/dal/orders";
 import type { Order } from "@/types/order";
 import { getErrorMessage } from "@/lib/api/error";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import { BadgeCheck, Building2, ExternalLink, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 function formatCurrency(amount: number, currency: string) {
@@ -200,7 +201,7 @@ export function AdminBankTransfersView() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-semibold text-zinc-900">#{order.id}</div>
+                      <div className="font-semibold text-zinc-900">{getOrderDisplayId(order)}</div>
                       <span
                         className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName(order.status)}`}
                       >

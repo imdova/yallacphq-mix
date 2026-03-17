@@ -7,6 +7,7 @@ export const paymentMethodSchema = z.enum(["card", "wallet", "cash"]);
 
 export const orderSchema = z.object({
   id: z.string(),
+  publicId: z.string().optional(),
   studentName: z.string(),
   studentEmail: z.string().email(),
   studentPhone: z.string().optional(),

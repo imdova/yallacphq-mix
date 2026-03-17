@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Order } from "@/types/order";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import { Copy, ReceiptText } from "lucide-react";
 
 function formatCurrency(amount: number, currency: string) {
@@ -72,14 +73,14 @@ export function OrderDetailsModal({
             {order ? (
               <span className="inline-flex items-center gap-2">
                 <span>
-                  Order <span className="font-semibold text-zinc-800">#{order.id}</span>
+                  Order <span className="font-semibold text-zinc-800">{getOrderDisplayId(order)}</span>
                 </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   className="h-8 w-8 rounded-xl border-zinc-200"
-                  onClick={() => void copyText(order.id)}
+                  onClick={() => void copyText(getOrderDisplayId(order))}
                   aria-label="Copy order ID"
                 >
                   <Copy className="h-4 w-4" />

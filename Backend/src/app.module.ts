@@ -20,6 +20,7 @@ import { PromoCodesModule } from './modules/promo-codes/promo-codes.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { randomUUID } from 'crypto';
 
 function getRequestId(req: unknown): string | undefined {
@@ -104,6 +105,7 @@ function getReqBasics(req: unknown): { method?: string; url?: string } {
     SettingsModule,
     UploadModule,
     AdminModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

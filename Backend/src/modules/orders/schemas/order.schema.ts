@@ -12,6 +12,10 @@ export type PaymentMethod = 'card' | 'wallet' | 'cash';
 
 @Schema({ timestamps: true })
 export class Order {
+  /** User-facing order ID (e.g. #CPHQE-1A2B). Backfilled for old orders when missing. */
+  @Prop()
+  publicId?: string;
+
   @Prop({ required: true })
   studentName!: string;
 

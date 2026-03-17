@@ -9,6 +9,7 @@ import {
   type PaymentMethod,
 } from './schemas/order.schema';
 import type { CreateOrderBody, UpdateOrderBody } from '../../contracts';
+import { generatePublicId } from './public-id.util';
 
 export type CreatePendingOrderParams = {
   studentName: string;
@@ -35,6 +36,7 @@ export class OrdersService {
   async createPending(params: CreatePendingOrderParams) {
     return this.orderModel.create({
       ...params,
+      publicId: generatePublicId(params.courseTitle),
       status: 'pending',
       paymentMethod: params.paymentMethod ?? (params.provider === 'manual' ? 'cash' : undefined),
     });
@@ -73,6 +75,7 @@ export class OrdersService {
       refundedAt: body.refundedAt,
       courseIds: body.courseIds,
       bankTransferProofUrl: body.bankTransferProofUrl,
+      publicId: generatePublicId(body.courseTitle),
     });
   }
 

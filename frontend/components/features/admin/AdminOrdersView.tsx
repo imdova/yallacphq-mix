@@ -19,6 +19,7 @@ import { getAdminOrders, removeAdminOrder, updateOrderStatus } from "@/lib/dal/o
 import type { Order, OrderStatus } from "@/types/order";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api/error";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import {
   BadgeCheck,
   BadgeX,
@@ -181,7 +182,7 @@ export function AdminOrdersView() {
       if (provider !== "all" && o.provider !== provider) return false;
       if (!q) return true;
       return (
-        o.id.toLowerCase().includes(q) ||
+        getOrderDisplayId(o).toLowerCase().includes(q) ||
         o.studentName.toLowerCase().includes(q) ||
         o.studentEmail.toLowerCase().includes(q) ||
         o.courseTitle.toLowerCase().includes(q) ||
@@ -237,6 +238,7 @@ export function AdminOrdersView() {
         meta: { width: "220px" },
         cell: ({ row }) => {
           const o = row.original;
+          const displayId = getOrderDisplayId(o);
           return (
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -248,7 +250,7 @@ export function AdminOrdersView() {
                   }}
                   className="max-w-[160px] truncate font-semibold text-zinc-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-1 rounded"
                 >
-                  #{o.id}
+                  {displayId}
                 </button>
                 <Button
                   type="button"
@@ -257,7 +259,7 @@ export function AdminOrdersView() {
                   className="h-7 w-7 rounded-lg border-zinc-200"
                   onClick={(e) => {
                     e.stopPropagation();
-                    void copyText(o.id);
+                    void copyText(displayId);
                   }}
                   aria-label="Copy order id"
                 >
@@ -543,7 +545,7 @@ export function AdminOrdersView() {
                 className="h-10 w-full rounded-xl border-zinc-200 sm:w-auto"
                 onClick={() => {
                   const rows = filtered.map((o) => ({
-                    id: o.id,
+                    orderId: getOrderDisplayId(o),
                     studentName: o.studentName,
                     studentEmail: o.studentEmail,
                     courseTitle: o.courseTitle,
@@ -641,7 +643,7 @@ export function AdminOrdersView() {
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <button
+                          <button
                                 type="button"
                                 onClick={() => {
                                   setDetailsOrder(o);
@@ -649,7 +651,7 @@ export function AdminOrdersView() {
                                 }}
                                 className="truncate text-left font-semibold text-zinc-900 underline-offset-2 hover:underline"
                               >
-                                #{o.id}
+                                {getOrderDisplayId(o)}
                               </button>
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <span
@@ -677,7 +679,7 @@ export function AdminOrdersView() {
                               size="icon"
                               variant="outline"
                               className="h-8 w-8 shrink-0 rounded-lg border-zinc-200"
-                              onClick={() => void copyText(o.id)}
+                              onClick={() => void copyText(getOrderDisplayId(o))}
                               aria-label="Copy order id"
                             >
                               <Copy className="h-3.5 w-3.5" />
@@ -820,7 +822,7 @@ export function AdminOrdersView() {
         title="Refund this order?"
         description={
           refundOrder
-            ? `This will mark order #${refundOrder.id} as refunded. (Demo behavior)`
+            ? `This will mark order ${getOrderDisplayId(refundOrder)} as refunded. (Demo behavior)`
             : "This will mark the order as refunded."
         }
         confirmText="Refund"
@@ -838,7 +840,7 @@ export function AdminOrdersView() {
         title="Delete order?"
         description={
           deleteOrder
-            ? `This will permanently remove order #${deleteOrder.id}. (Demo behavior)`
+            ? `This will permanently remove order ${getOrderDisplayId(deleteOrder)}. (Demo behavior)`
             : "This will permanently remove the order."
         }
         confirmText="Delete"

@@ -152,10 +152,9 @@ export class PaymobService {
         `Paymob integration is configured for ${this.paymobCurrency} only. This order is in ${currencyUpper}. Use Card/PayPal or Bank Transfer, or use ${this.paymobCurrency} for Paymob.`,
       );
     }
+    // Paymob requires amount as integer in smallest currency unit (e.g. 100 = EGP 1, 600 = EGP 6).
     const amountSmallest = this.toSmallestUnit(amount, currency);
-    const amountForPayload = this.amountInMainUnit
-      ? Math.round(amount * 100) / 100
-      : amountSmallest;
+    const amountInteger = Math.round(amountSmallest);
     let paymentMethodIds: number[];
     if (paymobIntegrationType) {
       paymentMethodIds = this.getIntegrationIdsForType(paymobIntegrationType);
@@ -172,13 +171,13 @@ export class PaymobService {
       paymentMethodIds = this.paymentMethodIds.length > 0 ? this.paymentMethodIds : [this.integrationId];
     }
     const payload = {
-      amount: amountForPayload,
+      amount: amountInteger,
       currency: this.paymobCurrency,
       payment_methods: paymentMethodIds,
       items: [
         {
           name: 'yallaCphq',
-          amount: amountForPayload,
+          amount: amountInteger,
           quantity: 1,
           description: courseTitle,
         },

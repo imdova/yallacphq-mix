@@ -19,6 +19,7 @@ import { getUserOrders } from "@/lib/dal/orders";
 import { cn } from "@/lib/utils";
 import type { Order } from "@/types/order";
 import { getErrorMessage } from "@/lib/api/error";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import {
   BadgeCheck,
   BadgeX,
@@ -122,7 +123,7 @@ export function StudentOrdersView() {
 
     return orders.filter((o) => {
       if (q) {
-        const hay = `${o.id} ${o.studentEmail} ${o.courseTitle} ${o.transactionId ?? ""} ${o.promoCode ?? ""}`.toLowerCase();
+        const hay = `${getOrderDisplayId(o)} ${o.studentEmail} ${o.courseTitle} ${o.transactionId ?? ""} ${o.promoCode ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (status !== "all" && o.status !== status) return false;
@@ -153,6 +154,7 @@ export function StudentOrdersView() {
         header: "Order",
         cell: ({ row }) => {
           const o = row.original;
+          const displayId = getOrderDisplayId(o);
           return (
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -164,7 +166,7 @@ export function StudentOrdersView() {
                   }}
                   className="font-semibold text-zinc-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-1 rounded"
                 >
-                  #{o.id}
+                  {displayId}
                 </button>
                 <Button
                   type="button"
@@ -173,7 +175,7 @@ export function StudentOrdersView() {
                   className="h-7 w-7 rounded-lg border-zinc-200"
                   onClick={(e) => {
                     e.stopPropagation();
-                    void copyText(o.id);
+                    void copyText(displayId);
                   }}
                   aria-label="Copy order id"
                 >

@@ -20,8 +20,11 @@ export enum PaymentMethodDto {
 }
 
 export class ApiOrderDto {
-  @ApiProperty({ example: '65f3c77b0f6d1b5a3d1d9a10' })
+  @ApiProperty({ example: '65f3c77b0f6d1b5a3d1d9a10', description: 'Internal order identifier (MongoDB _id)' })
   id!: string;
+
+  @ApiProperty({ example: '#CPHQE-1A2B', description: 'User-facing order ID' })
+  publicId!: string;
 
   @ApiProperty({ example: 'Jane Student' })
   studentName!: string;

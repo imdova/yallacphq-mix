@@ -347,7 +347,7 @@ export class PaymobService {
         `Paymob callback parsed: orderId=${orderId ?? 'null'} success=${success} transactionId=${transactionId ?? 'null'}`,
       );
     } else if (hasIntention && !transactionPayload) {
-      // Intention-only payload (e.g. some Paymob flows send intention first, transaction later or nested differently)
+      // Intention-only payload: Paymob sometimes sends only intention (no transaction) when payment completes.
       if (
         !this.skipHmacVerification &&
         !this.verifyHmacNewFormat(body, receivedHmac)
@@ -361,7 +361,10 @@ export class PaymobService {
         orderId = detail.special_reference as string | undefined;
       }
       const status = (intentionPayload.status as string)?.toLowerCase();
-      success = status === 'success' || status === 'approved' || intentionPayload.success === true;
+      const explicitSuccess = intentionPayload.success === true || status === 'success' || status === 'approved';
+      const explicitFailure = intentionPayload.success === false || status === 'failed' || status === 'rejected';
+      // If Paymob did not send transaction, assume success when they hit our callback (they only call it when payment is done).
+      success = explicitFailure ? false : (explicitSuccess || true);
       transactionId = intentionPayload.id != null ? String(intentionPayload.id) : undefined;
       this.logger.log(
         `Paymob callback (intention-only): orderId=${orderId ?? 'null'} success=${success} intentionStatus=${intentionPayload.status ?? 'null'}`,

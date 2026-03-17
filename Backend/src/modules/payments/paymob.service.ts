@@ -293,37 +293,79 @@ export class PaymobService {
   async handleCallback(
     body: Record<string, unknown>,
   ): Promise<{ success: boolean; message?: string }> {
-    this.logger.log(`Paymob webhook: ${JSON.stringify(body).slice(0, 500)}`);
+    this.logger.log(`Paymob webhook: ${JSON.stringify(body).slice(0, 800)}`);
     const receivedHmac = body.hmac as string | undefined;
     if (!receivedHmac) {
       throw new BadRequestException('Missing hmac');
     }
 
     const intentionPayload = body.intention as Record<string, unknown> | undefined;
-    const transactionPayload = body.transaction as Record<string, unknown> | undefined;
-    const isNewFormat =
+    // Transaction can be at body.transaction or nested inside body.intention.transaction
+    let transactionPayload = body.transaction as Record<string, unknown> | undefined;
+    if (
       intentionPayload &&
       typeof intentionPayload === 'object' &&
-      transactionPayload &&
-      typeof transactionPayload === 'object';
+      !transactionPayload &&
+      intentionPayload.transaction != null
+    ) {
+      const t = intentionPayload.transaction;
+      transactionPayload =
+        typeof t === 'object' && t !== null ? (t as Record<string, unknown>) : undefined;
+    }
+    const hasIntention =
+      intentionPayload && typeof intentionPayload === 'object';
+    const isNewFormat = hasIntention && transactionPayload && typeof transactionPayload === 'object';
 
     let orderId: string | undefined;
     let success: boolean;
     let transactionId: string | undefined;
 
-    if (isNewFormat) {
+    if (isNewFormat && transactionPayload) {
+      const tx = transactionPayload;
       if (
         !this.skipHmacVerification &&
         !this.verifyHmacNewFormat(body, receivedHmac)
       ) {
+        this.logger.warn('Paymob callback: HMAC verification failed (new format). Set PAYMOB_SKIP_HMAC_VERIFICATION=true to test.');
         throw new BadRequestException('Invalid HMAC');
       }
-      orderId = intentionPayload.special_reference as string | undefined;
-      success = transactionPayload.success === true;
+      orderId = (intentionPayload!.special_reference as string | undefined) ?? undefined;
+      if (!orderId && intentionPayload!.intention_detail && typeof intentionPayload.intention_detail === 'object') {
+        const detail = intentionPayload.intention_detail as Record<string, unknown>;
+        orderId = detail.special_reference as string | undefined;
+      }
+      success =
+        tx.success === true ||
+        tx.status === 'success' ||
+        tx.status === 'approved' ||
+        (tx as Record<string, unknown>).approved === true;
       transactionId =
-        transactionPayload.id != null
-          ? String(transactionPayload.id)
+        tx.id != null
+          ? String(tx.id)
           : undefined;
+      this.logger.log(
+        `Paymob callback parsed: orderId=${orderId ?? 'null'} success=${success} transactionId=${transactionId ?? 'null'}`,
+      );
+    } else if (hasIntention && !transactionPayload) {
+      // Intention-only payload (e.g. some Paymob flows send intention first, transaction later or nested differently)
+      if (
+        !this.skipHmacVerification &&
+        !this.verifyHmacNewFormat(body, receivedHmac)
+      ) {
+        this.logger.warn('Paymob callback: HMAC failed for intention-only payload.');
+        throw new BadRequestException('Invalid HMAC');
+      }
+      orderId = (intentionPayload.special_reference as string | undefined) ?? undefined;
+      if (!orderId && intentionPayload.intention_detail && typeof intentionPayload.intention_detail === 'object') {
+        const detail = intentionPayload.intention_detail as Record<string, unknown>;
+        orderId = detail.special_reference as string | undefined;
+      }
+      const status = (intentionPayload.status as string)?.toLowerCase();
+      success = status === 'success' || status === 'approved' || intentionPayload.success === true;
+      transactionId = intentionPayload.id != null ? String(intentionPayload.id) : undefined;
+      this.logger.log(
+        `Paymob callback (intention-only): orderId=${orderId ?? 'null'} success=${success} intentionStatus=${intentionPayload.status ?? 'null'}`,
+      );
     } else {
       const obj = body.obj;
       const parsedObj =
@@ -377,9 +419,21 @@ export class PaymobService {
         transactionId,
       });
       if (updated) {
-        await this.orderCompletion.handlePaidOrder(updated, {
-          providerLabel: 'Paymob',
-        });
+        try {
+          await this.orderCompletion.handlePaidOrder(updated, {
+            providerLabel: 'Paymob',
+          });
+          this.logger.log(
+            `Paymob order ${orderId} marked paid and enrollment completed (userId=${updated.userId ?? 'none'}, courseIds=${updated.courseIds?.length ?? 0})`,
+          );
+        } catch (err) {
+          this.logger.error(
+            `Paymob order ${orderId} marked paid but enrollment failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          // Order stays paid; enrollment can be retried manually
+        }
+      } else {
+        this.logger.warn(`Paymob order ${orderId}: updateStatus returned null`);
       }
       this.logger.log(`Paymob order ${orderId} marked paid`);
     } else {

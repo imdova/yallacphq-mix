@@ -15,6 +15,9 @@ const billingDataSchema = z.object({
 export const createPaymentSessionBodySchema = z.object({
   method: checkoutPaymentMethodSchema,
   courseTitle: z.string().min(1),
+  studentName: z.string().min(1).optional(),
+  studentEmail: z.string().email().optional(),
+  studentPhone: z.string().min(1).optional(),
   currency: z.string().optional(),
   amount: z.coerce.number().min(0),
   discountAmount: z.coerce.number().min(0).optional(),
@@ -38,6 +41,8 @@ export const createPaymentSessionResponseSchema = z.object({
   order: orderSchema,
   /** Present when provider is paymob; redirect user to this URL to complete payment. */
   paymobRedirectUrl: z.string().url().optional(),
+  /** Relative frontend path to open after checkout/payment. */
+  postCheckoutNextPath: z.string().min(1).optional(),
 });
 
 export type CreatePaymentSessionResponse = z.infer<

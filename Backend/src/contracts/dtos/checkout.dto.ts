@@ -5,6 +5,7 @@ export enum CheckoutPaymentMethodDto {
   paypal = 'paypal',
   card = 'card',
   bank = 'bank',
+  paymob = 'paymob',
 }
 
 export class CreatePaymentSessionBodyDto {
@@ -16,6 +17,15 @@ export class CreatePaymentSessionBodyDto {
 
   @ApiProperty({ example: 'CPHQ Exam Prep 2026', minLength: 1 })
   courseTitle!: string;
+
+  @ApiProperty({ required: false, example: 'Jane Student' })
+  studentName?: string;
+
+  @ApiProperty({ required: false, example: 'student@example.com' })
+  studentEmail?: string;
+
+  @ApiProperty({ required: false, example: '+201001234567' })
+  studentPhone?: string;
 
   @ApiProperty({ required: false, example: 'usd' })
   currency?: string;
@@ -55,6 +65,12 @@ export class CreatePaymentSessionResponseDto {
 
   @ApiProperty({ type: ApiOrderDto })
   order!: ApiOrderDto;
+
+  @ApiProperty({
+    required: false,
+    example: '/set-password?email=student%40example.com&auto=1&next=%2Fdashboard%2Fcourses',
+  })
+  postCheckoutNextPath?: string;
 }
 
 export class ConfirmPaymentBodyDto {

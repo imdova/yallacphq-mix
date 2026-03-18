@@ -140,6 +140,7 @@ export class PaymobService {
     courseTitle: string,
     billingData: PaymobBillingData,
     paymobIntegrationType?: 'card' | 'ewallet' | 'kiosk',
+    redirectUrl?: string,
   ): Promise<{ intentionId: string; unifiedCheckoutUrl: string }> {
     if (!this.isConfigured()) {
       throw new BadRequestException(
@@ -198,7 +199,9 @@ export class PaymobService {
         shipping_method: 'PKG',
       },
       notification_url: this.callbackUrl,
-      ...(this.successRedirectUrl && { redirection_url: this.successRedirectUrl }),
+      ...((redirectUrl || this.successRedirectUrl) && {
+        redirection_url: redirectUrl || this.successRedirectUrl,
+      }),
       special_reference: orderId,
     };
 

@@ -16,6 +16,7 @@ import { ApiAuth } from '../../common/swagger/decorators/api-auth.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { RequestUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/auth/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import { Role } from '../../common/auth/role';
@@ -92,21 +93,20 @@ export class UploadController {
 
   @Post('bank-transfer')
   @Version('1')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: multer.memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
-  @ApiAuth()
   @ApiConsumes('multipart/form-data')
   @ApiFileUpload({ fieldName: 'file', required: true })
-  @ApiOperation({ summary: 'Upload bank transfer receipt (authenticated user)' })
+  @ApiOperation({ summary: 'Upload bank transfer receipt (guest or authenticated user)' })
   @ApiOkResponse({ description: 'Returns the public URL of the uploaded file' })
   async uploadBankTransfer(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: RequestUser | null,
   ): Promise<UploadResponse> {
     if (!file?.buffer) {
       throw new BadRequestException('No file provided. Send multipart/form-data with field "file".');
@@ -118,7 +118,7 @@ export class UploadController {
         mimetype: file.mimetype ?? 'application/octet-stream',
         originalname: file.originalname,
       },
-      user.sub,
+      user?.sub ?? 'guest',
     );
   }
 }

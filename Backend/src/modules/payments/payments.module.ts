@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../../common/common.module';
 import { CoursesModule } from '../courses/courses.module';
+import { MailModule } from '../mail/mail.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PromoCodesModule } from '../promo-codes/promo-codes.module';
 import { UsersModule } from '../users/users.module';
@@ -13,7 +14,7 @@ import { PaymentsService } from './payments.service';
 import { PAYMENTS_PROVIDER } from './payments.types';
 
 @Module({
-  imports: [CommonModule, OrdersModule, UsersModule, CoursesModule, PromoCodesModule],
+  imports: [CommonModule, OrdersModule, UsersModule, CoursesModule, PromoCodesModule, MailModule],
   controllers: [PaymentsController, CheckoutController, PaymobController],
   providers: [
     PaymentsService,

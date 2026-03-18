@@ -16,10 +16,10 @@ import { DataTable } from "@/components/shared/data-table";
 import { ConfirmDialog } from "@/components/features/admin/ConfirmDialog";
 import { OrderDetailsModal } from "@/components/features/admin/OrderDetailsModal";
 import { getAdminOrders, removeAdminOrder, updateOrderStatus } from "@/lib/dal/orders";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import type { Order, OrderStatus } from "@/types/order";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api/error";
-import { getOrderDisplayId } from "@/lib/order-display-id";
 import {
   BadgeCheck,
   BadgeX,
@@ -390,7 +390,7 @@ export function AdminOrdersView() {
       },
       {
         id: "actions",
-        header: <span className="sr-only">Actions</span>,
+        header: () => <span className="sr-only">Actions</span>,
         enableSorting: false,
         meta: { width: "140px", align: "right" },
         cell: ({ row }) => {
@@ -633,6 +633,7 @@ export function AdminOrdersView() {
                   const net = Math.max(0, o.amount - (o.discountAmount ?? 0));
                   const tid = o.transactionId?.trim();
                   const canRefund = o.status === "paid";
+                  const displayId = getOrderDisplayId(o);
 
                   return (
                     <Card
@@ -643,7 +644,7 @@ export function AdminOrdersView() {
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                          <button
+                              <button
                                 type="button"
                                 onClick={() => {
                                   setDetailsOrder(o);
@@ -651,7 +652,7 @@ export function AdminOrdersView() {
                                 }}
                                 className="truncate text-left font-semibold text-zinc-900 underline-offset-2 hover:underline"
                               >
-                                {getOrderDisplayId(o)}
+                                {displayId}
                               </button>
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <span
@@ -679,7 +680,7 @@ export function AdminOrdersView() {
                               size="icon"
                               variant="outline"
                               className="h-8 w-8 shrink-0 rounded-lg border-zinc-200"
-                              onClick={() => void copyText(getOrderDisplayId(o))}
+                              onClick={() => void copyText(displayId)}
                               aria-label="Copy order id"
                             >
                               <Copy className="h-3.5 w-3.5" />

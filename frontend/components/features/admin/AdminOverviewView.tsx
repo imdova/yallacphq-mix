@@ -19,10 +19,10 @@ import {
 import * as React from "react";
 import { fetchCourses } from "@/lib/dal/courses";
 import { fetchAdminOrders } from "@/lib/dal/orders";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import { fetchPromoCodes } from "@/lib/dal/promo-codes";
 import { fetchUsers } from "@/lib/dal/user";
 import type { Order } from "@/types/order";
-import { getOrderDisplayId } from "@/lib/order-display-id";
 
 function formatUsd(amount: number) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(amount);
@@ -242,6 +242,7 @@ export function AdminOverviewView() {
               <ul className="divide-y divide-zinc-100">
                 {recentOrders.map((o) => {
                   const net = o.amount - (o.discountAmount ?? 0);
+                  const displayId = getOrderDisplayId(o);
                   return (
                     <li key={o.id}>
                       <Link
@@ -259,7 +260,7 @@ export function AdminOverviewView() {
                             {o.courseTitle}
                           </p>
                           <p className="mt-0.5 truncate text-xs text-zinc-400">
-                            {o.studentEmail} · <span className="font-mono">{getOrderDisplayId(o)}</span>
+                            {o.studentEmail} · <span className="font-mono">{displayId}</span>
                           </p>
                         </div>
                         <div className="shrink-0 text-right">

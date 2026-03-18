@@ -17,7 +17,7 @@ function isAdminApi(pathname: string) {
 }
 
 function isProtectedApi(pathname: string) {
-  return isAdminApi(pathname) || pathname.startsWith("/api/orders") || pathname.startsWith("/api/checkout");
+  return isAdminApi(pathname) || pathname.startsWith("/api/orders");
 }
 
 export async function middleware(req: NextRequest) {
@@ -69,7 +69,6 @@ export const config = {
     "/auth/:path*",
     "/api/admin/:path*",
     "/api/orders/:path*",
-    "/api/checkout/:path*",
   ],
 };
 

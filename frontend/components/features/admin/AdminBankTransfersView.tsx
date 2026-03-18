@@ -4,9 +4,9 @@ import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getAdminOrders, updateOrderStatus } from "@/lib/dal/orders";
+import { getOrderDisplayId } from "@/lib/order-display-id";
 import type { Order } from "@/types/order";
 import { getErrorMessage } from "@/lib/api/error";
-import { getOrderDisplayId } from "@/lib/order-display-id";
 import { BadgeCheck, Building2, ExternalLink, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 function formatCurrency(amount: number, currency: string) {
@@ -194,93 +194,96 @@ export function AdminBankTransfersView() {
             </div>
           ) : (
             <ul className="space-y-4">
-              {bankTransfers.map((order) => (
-                <li
-                  key={order.id}
-                  className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="font-semibold text-zinc-900">{getOrderDisplayId(order)}</div>
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName(order.status)}`}
-                      >
-                        {statusLabel(order.status)}
-                      </span>
+              {bankTransfers.map((order) => {
+                const displayId = getOrderDisplayId(order);
+                return (
+                  <li
+                    key={order.id}
+                    className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-semibold text-zinc-900">{displayId}</div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName(order.status)}`}
+                        >
+                          {statusLabel(order.status)}
+                        </span>
+                      </div>
+                      <div className="text-sm text-zinc-600">
+                        {order.studentName} · {order.studentEmail}
+                      </div>
+                      <div className="mt-1 text-sm text-zinc-700">{order.courseTitle}</div>
+                      <div className="mt-1 text-sm font-medium text-zinc-900">
+                        {formatCurrency(order.amount - (order.discountAmount ?? 0), order.currency)}
+                        {(order.discountAmount ?? 0) > 0 && (
+                          <span className="ml-2 text-zinc-500">
+                            (discount {formatCurrency(order.discountAmount ?? 0, order.currency)}
+                            {order.promoCode ? ` · ${order.promoCode}` : ""})
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500">{formatDate(order.createdAt)}</div>
                     </div>
-                    <div className="text-sm text-zinc-600">
-                      {order.studentName} · {order.studentEmail}
-                    </div>
-                    <div className="mt-1 text-sm text-zinc-700">{order.courseTitle}</div>
-                    <div className="mt-1 text-sm font-medium text-zinc-900">
-                      {formatCurrency(order.amount - (order.discountAmount ?? 0), order.currency)}
-                      {(order.discountAmount ?? 0) > 0 && (
-                        <span className="ml-2 text-zinc-500">
-                          (discount {formatCurrency(order.discountAmount ?? 0, order.currency)}
-                          {order.promoCode ? ` · ${order.promoCode}` : ""})
+                    <div className="flex flex-shrink-0 items-center gap-3">
+                      {order.bankTransferProofUrl ? (
+                        <a
+                          href={order.bankTransferProofUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                        >
+                          View receipt
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      ) : (
+                        <span className="text-sm text-zinc-500">No receipt</span>
+                      )}
+                      {order.status === "pending" ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                            disabled={actingId === order.id}
+                            onClick={() => void handleStatusChange(order, "failed")}
+                          >
+                            {actingId === order.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <XCircle className="h-4 w-4" />
+                                Reject
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                            disabled={actingId === order.id}
+                            onClick={() => void handleStatusChange(order, "paid")}
+                          >
+                            {actingId === order.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <BadgeCheck className="h-4 w-4" />
+                                Approve
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-sm font-medium text-zinc-500">
+                          {order.status === "paid"
+                            ? "Approved"
+                            : order.status === "failed"
+                              ? "Rejected"
+                              : "Completed"}
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-zinc-500">{formatDate(order.createdAt)}</div>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-3">
-                    {order.bankTransferProofUrl ? (
-                      <a
-                        href={order.bankTransferProofUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-                      >
-                        View receipt
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    ) : (
-                      <span className="text-sm text-zinc-500">No receipt</span>
-                    )}
-                    {order.status === "pending" ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                          disabled={actingId === order.id}
-                          onClick={() => void handleStatusChange(order, "failed")}
-                        >
-                          {actingId === order.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <XCircle className="h-4 w-4" />
-                              Reject
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-                          disabled={actingId === order.id}
-                          onClick={() => void handleStatusChange(order, "paid")}
-                        >
-                          {actingId === order.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <BadgeCheck className="h-4 w-4" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-sm font-medium text-zinc-500">
-                        {order.status === "paid"
-                          ? "Approved"
-                          : order.status === "failed"
-                            ? "Rejected"
-                            : "Completed"}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>

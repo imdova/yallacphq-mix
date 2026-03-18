@@ -9,11 +9,27 @@ import { LessonContentView } from "@/components/features/dashboard/LessonContent
 import { QuizTakingClient, QUIZ_BANK } from "@/app/dashboard/quizzes/QuizTakingClient";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { getMyCourses } from "@/lib/dal/courses";
+import { getErrorMessage } from "@/lib/api/error";
+import type { Course, CourseCurriculumLecture } from "@/types/course";
 import { ArrowLeft, Clock, ListOrdered, Menu, Shuffle, SlidersHorizontal, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type QuizQuestionOrder = "regular" | "random";
 type QuizPracticeMode = "quiz" | "test" | "study";
+
+type FlattenedLecture = CourseCurriculumLecture & {
+  sectionId: string;
+  sectionTitle: string;
+  sectionDescription?: string;
+};
+
+function buildLessonHref(courseId: string, lessonId: string): string {
+  const params = new URLSearchParams();
+  params.set("course", courseId);
+  params.set("lesson", lessonId);
+  return `/dashboard/courses/lesson?${params.toString()}`;
+}
 
 function LessonQuizConfiguration({ moduleId }: { moduleId: string }) {
   const searchParams = useSearchParams();
@@ -278,10 +294,178 @@ function LessonQuizConfiguration({ moduleId }: { moduleId: string }) {
 export default function LessonPage() {
   const [open, setOpen] = React.useState(false);
   const searchParams = useSearchParams();
+  const [courses, setCourses] = React.useState<Course[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    getMyCourses()
+      .then((items) => {
+        if (!cancelled) {
+          setCourses(items);
+          setLoadError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setCourses([]);
+          setLoadError(getErrorMessage(error, "Failed to load your courses"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const courseId = searchParams.get("course")?.trim() ?? "";
+  const lessonId = searchParams.get("lesson")?.trim() ?? "";
   const quizModuleId = searchParams.get("quiz");
   const quizStarted = searchParams.get("quizStart") === "1";
   const quizMode = searchParams.get("mode");
   const isStudyMode = quizMode === "study";
+  const activeCourse = React.useMemo(() => {
+    if (!courses.length) return null;
+    if (courseId) return courses.find((course) => course.id === courseId) ?? null;
+    return courses[0] ?? null;
+  }, [courses, courseId]);
+
+  const flattenedLectures = React.useMemo<FlattenedLecture[]>(() => {
+    const sections = activeCourse?.curriculumSections ?? [];
+    return sections.flatMap((section) =>
+      (section.items ?? []).flatMap((item) =>
+        item.type === "lecture"
+          ? [
+              {
+                ...item,
+                sectionId: section.id,
+                sectionTitle: section.title,
+                sectionDescription: section.description,
+              },
+            ]
+          : []
+      )
+    );
+  }, [activeCourse]);
+
+  const currentLecture = React.useMemo(() => {
+    if (!flattenedLectures.length) return null;
+    if (lessonId) return flattenedLectures.find((lecture) => lecture.id === lessonId) ?? flattenedLectures[0];
+    return flattenedLectures[0];
+  }, [flattenedLectures, lessonId]);
+
+  const currentLessonIndex = currentLecture
+    ? flattenedLectures.findIndex((lecture) => lecture.id === currentLecture.id)
+    : -1;
+  const previousLecture =
+    currentLessonIndex > 0 ? flattenedLectures[currentLessonIndex - 1] : null;
+  const nextLecture =
+    currentLessonIndex >= 0 && currentLessonIndex < flattenedLectures.length - 1
+      ? flattenedLectures[currentLessonIndex + 1]
+      : null;
+
+  const sidebarSections = React.useMemo(() => {
+    if (!activeCourse) return [];
+
+    return (activeCourse.curriculumSections ?? []).map((section) => {
+      const items = section.items ?? [];
+      const lessons = items.flatMap((item) =>
+        item.type === "lecture"
+          ? [
+              {
+                id: item.id,
+                title: item.title,
+                href: buildLessonHref(activeCourse.id, item.id),
+                current: currentLecture?.id === item.id,
+              },
+            ]
+          : []
+      );
+      const quizzes = items.flatMap((item) =>
+        item.type === "quiz"
+          ? [
+              {
+                id: item.id,
+                title: item.title,
+              },
+            ]
+          : []
+      );
+
+      return {
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        current: lessons.some((lesson) => lesson.current),
+        lessons,
+        quizzes,
+      };
+    });
+  }, [activeCourse, currentLecture?.id]);
+
+  const content = loading ? (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+        <p className="text-sm text-zinc-500">Loading course content…</p>
+      </div>
+    </div>
+  ) : loadError ? (
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4">
+      <p className="text-sm font-semibold text-rose-800">Couldn’t load your course</p>
+      <p className="mt-1 text-sm text-rose-700">{loadError}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button asChild variant="outline" className="rounded-xl border-rose-200">
+          <Link href="/dashboard/courses">Back to courses</Link>
+        </Button>
+      </div>
+    </div>
+  ) : !activeCourse ? (
+    <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-6 shadow-sm">
+      <p className="text-base font-semibold text-zinc-900">
+        {courseId ? "This course is not in your dashboard" : "No enrolled courses yet"}
+      </p>
+      <p className="mt-1 text-sm text-zinc-600">
+        {courseId
+          ? "Open a course from your My Courses page to view its lessons."
+          : "Enroll in a course first, then your lesson content will appear here."}
+      </p>
+      <div className="mt-4">
+        <Button asChild variant="outline" className="rounded-xl border-zinc-200">
+          <Link href="/dashboard/courses">Go to my courses</Link>
+        </Button>
+      </div>
+    </div>
+  ) : quizModuleId ? (
+    quizStarted ? (
+      <QuizTakingClient moduleId={quizModuleId} />
+    ) : (
+      <LessonQuizConfiguration moduleId={quizModuleId} />
+    )
+  ) : (
+    <LessonContentView
+      courseTitle={activeCourse.title}
+      courseDescription={activeCourse.description}
+      sectionTitle={currentLecture?.sectionTitle}
+      sectionDescription={currentLecture?.sectionDescription}
+      lesson={currentLecture}
+      lessonNumber={currentLessonIndex >= 0 ? currentLessonIndex + 1 : 0}
+      totalLessons={flattenedLectures.length}
+      previousLesson={
+        previousLecture
+          ? { title: previousLecture.title, href: buildLessonHref(activeCourse.id, previousLecture.id) }
+          : null
+      }
+      nextLesson={
+        nextLecture ? { title: nextLecture.title, href: buildLessonHref(activeCourse.id, nextLecture.id) } : null
+      }
+    />
+  );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -304,11 +488,23 @@ export default function LessonPage() {
         <div className="flex-1">
           <div className="flex">
             <div className="hidden lg:block">
-              <LessonSidebar />
+              <LessonSidebar
+                courseTitle={activeCourse?.title}
+                sections={sidebarSections}
+                totalLessons={flattenedLectures.length}
+                currentLessonIndex={currentLessonIndex}
+              />
             </div>
 
             <SheetContent side="left" className="p-0" showClose>
-              <LessonSidebar variant="sheet" onNavigate={() => setOpen(false)} />
+              <LessonSidebar
+                courseTitle={activeCourse?.title}
+                sections={sidebarSections}
+                totalLessons={flattenedLectures.length}
+                currentLessonIndex={currentLessonIndex}
+                variant="sheet"
+                onNavigate={() => setOpen(false)}
+              />
             </SheetContent>
 
             <main className="min-w-0 flex-1 overflow-auto p-4 md:p-6">
@@ -317,15 +513,7 @@ export default function LessonPage() {
                   quizStarted && isStudyMode ? "max-w-[1100px]" : "max-w-5xl"
                 }`}
               >
-                {quizModuleId ? (
-                  quizStarted ? (
-                    <QuizTakingClient moduleId={quizModuleId} />
-                  ) : (
-                    <LessonQuizConfiguration moduleId={quizModuleId} />
-                  )
-                ) : (
-                  <LessonContentView />
-                )}
+                {content}
               </div>
             </main>
           </div>

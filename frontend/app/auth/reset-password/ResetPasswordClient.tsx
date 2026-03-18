@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Eye, EyeOff, Check, Circle } from "lucide-react";
 import { getErrorMessage } from "@/lib/api/error";
-import { authResetPassword } from "@/lib/dal/auth";
+import { authForgotPassword, authResetPassword } from "@/lib/dal/auth";
 
 function requirementMet(value: string, test: (v: string) => boolean) {
   return test(value);
@@ -20,6 +20,8 @@ export function ResetPasswordClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const email = searchParams.get("email") ?? "";
+  const auto = searchParams.get("auto") === "1";
+  const next = searchParams.get("next") ?? "/dashboard";
   const usingToken = Boolean(token);
 
   const [password, setPassword] = React.useState("");
@@ -28,8 +30,10 @@ export function ResetPasswordClient() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [autoSending, setAutoSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [info, setInfo] = React.useState<string | null>(null);
 
   const min8 = requirementMet(password, (v) => v.length >= 8);
   const hasUpper = requirementMet(password, (v) => /[A-Z]/.test(v));
@@ -38,6 +42,29 @@ export function ResetPasswordClient() {
   const allMet = min8 && hasUpper && hasNumber && hasSpecial;
   const match = password.length > 0 && password === confirm;
   const hasResetIdentifier = usingToken || Boolean(email);
+
+  React.useEffect(() => {
+    if (usingToken || !auto || !email) return;
+    let cancelled = false;
+    setAutoSending(true);
+    authForgotPassword(email)
+      .then(() => {
+        if (!cancelled) {
+          setInfo("We sent a reset link and OTP code to your email. Use either one to set your password.");
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(getErrorMessage(err, "We couldn't send your reset code. Please use Forgot Password or try again."));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAutoSending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auto, email, usingToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +81,12 @@ export function ResetPasswordClient() {
           : { email, otp, newPassword: password }
       );
       setSuccess(true);
-      window.setTimeout(() => router.push("/auth/login"), 700);
+      const loginUrl = new URL("/auth/login", window.location.origin);
+      loginUrl.searchParams.set("next", next.startsWith("/") ? next : "/dashboard");
+      if (email) {
+        loginUrl.searchParams.set("email", email);
+      }
+      window.setTimeout(() => router.push(`${loginUrl.pathname}${loginUrl.search}`), 700);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -82,6 +114,9 @@ export function ResetPasswordClient() {
           <p className="mt-2 text-zinc-600">
             Choose a strong password to secure your account.
           </p>
+          {autoSending ? (
+            <p className="mt-3 text-sm text-zinc-500">Sending your reset code…</p>
+          ) : null}
 
           {!hasResetIdentifier && (
             <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-zinc-700">
@@ -233,6 +268,11 @@ export function ResetPasswordClient() {
             {error ? (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
+              </p>
+            ) : null}
+            {info ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {info}
               </p>
             ) : null}
             {success ? (

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { confirmPayment } from "@/lib/dal/orders";
 import { getErrorMessage } from "@/lib/api/error";
 
+const PAYPAL_PENDING_ORDER_STORAGE_KEY = "paypal_pending_order_id";
+
 function PayPalReturnContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -13,8 +15,9 @@ function PayPalReturnContent() {
   const [message, setMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const ourOrderId = searchParams.get("our_order_id");
+    const ourOrderId = localStorage.getItem(PAYPAL_PENDING_ORDER_STORAGE_KEY);
     const token = searchParams.get("token");
+    const next = searchParams.get("next") ?? "/dashboard/courses";
 
     if (!ourOrderId || !token) {
       setStatus("error");
@@ -26,8 +29,9 @@ function PayPalReturnContent() {
     confirmPayment({ orderId: ourOrderId, transactionId: token })
       .then(() => {
         if (!cancelled) {
+          localStorage.removeItem(PAYPAL_PENDING_ORDER_STORAGE_KEY);
           setStatus("success");
-          router.replace("/dashboard/courses");
+          router.replace(next.startsWith("/") ? next : "/dashboard/courses");
         }
       })
       .catch((err: unknown) => {

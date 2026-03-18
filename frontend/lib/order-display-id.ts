@@ -1,17 +1,23 @@
-/**
- * User-facing order ID: never show raw Mongo ObjectId.
- * Uses publicId when present, otherwise derives #COURSE-XXXX from courseTitle + short id suffix.
- */
 export function getOrderDisplayId(order: {
+  id: string;
   publicId?: string;
   courseTitle?: string;
-  id: string;
 }): string {
-  if (order.publicId?.trim()) return order.publicId.trim();
-  const prefix = (order.courseTitle ?? "")
-    .replace(/\s+/g, "")
-    .toUpperCase()
-    .slice(0, 5) || "ORDER";
-  const suffix = (order.id ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase() || "0000";
+  const publicId = order.publicId?.trim();
+  if (publicId) {
+    return publicId.startsWith("#") ? publicId : `#${publicId}`;
+  }
+
+  const prefix =
+    order.courseTitle
+      ?.replace(/\s+/g, "")
+      .toUpperCase()
+      .slice(0, 5) || "ORDER";
+  const suffix =
+    order.id
+      ?.replace(/[^A-Za-z0-9]/g, "")
+      .slice(-4)
+      .toUpperCase() || "0000";
+
   return `#${prefix}-${suffix}`;
 }

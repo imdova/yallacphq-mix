@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Check, Copy, Info, Lock, Upload, X, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BANK, PRODUCT, STORAGE_KEY, type StoredCheckoutPayload } from "@/components/features/checkout/checkoutData";
-import { useAuth } from "@/contexts/auth-context";
 import { useCart } from "@/contexts/cart-context";
 import { getPublicCourse } from "@/lib/dal/courses";
 import { uploadBankTransferProof } from "@/lib/dal/upload";
@@ -17,7 +16,6 @@ import type { Course } from "@/types/course";
 
 export function BankTransferView() {
   const router = useRouter();
-  const { user, status } = useAuth();
   const { courseIds, clearCart, refreshCart } = useCart();
 
   const [cartCourses, setCartCourses] = React.useState<Course[]>([]);
@@ -141,11 +139,6 @@ export function BankTransferView() {
   const completeBankTransfer = async () => {
     setCheckoutError(null);
 
-    if (status !== "authenticated" || !user) {
-      router.push(`/auth/login?next=${encodeURIComponent(backHref)}`);
-      return;
-    }
-
     if (!receiptFile) {
       setCheckoutError("Please upload your bank transfer receipt to complete the order.");
       return;
@@ -166,11 +159,22 @@ export function BankTransferView() {
 
     setSubmitting(true);
     try {
+      const studentName = storedPayload?.studentName?.trim();
+      const studentEmail = storedPayload?.studentEmail?.trim();
+      const studentPhone = storedPayload?.studentPhone?.trim();
+      if (!studentName || !studentEmail) {
+        setCheckoutError("Missing student details. Please return to checkout and enter your name and email again.");
+        return;
+      }
+
       const { url } = await uploadBankTransferProof(receiptFile);
 
-      await createPaymentSession({
+      const session = await createPaymentSession({
         method: "bank",
         courseTitle: checkoutCourseTitle,
+        studentName,
+        studentEmail,
+        studentPhone: studentPhone || undefined,
         currency: "USD",
         amount: total,
         discountAmount: discountAmount || undefined,
@@ -185,7 +189,7 @@ export function BankTransferView() {
         await refreshCart();
       }
 
-      router.push("/dashboard/orders?from=checkout");
+      router.push(session.postCheckoutNextPath ?? "/dashboard/orders?from=checkout");
     } catch (e) {
       setCheckoutError(getErrorMessage(e, "Failed to complete bank transfer checkout"));
     } finally {

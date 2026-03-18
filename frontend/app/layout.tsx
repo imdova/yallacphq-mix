@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Source_Code_Pro, Plus_Jakarta_Sans } from "next/font/google";
+import { Inter, Source_Code_Pro, Plus_Jakarta_Sans, Cairo } from "next/font/google";
 import { AppProviders } from "@/components/shared/AppProviders";
 import "./globals.css";
 
@@ -21,6 +21,13 @@ const plusJakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700"],
 });
 
+const cairo = Cairo({
+  variable: "--font-arabic",
+  subsets: ["arabic"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Yalla CPHQ",
   description: "Production-grade SaaS starter",
@@ -37,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${sourceCodePro.variable} ${plusJakarta.variable} font-sans antialiased`}
+        className={`${inter.variable} ${sourceCodePro.variable} ${plusJakarta.variable} ${cairo.variable} font-sans antialiased`}
       >
         <AppProviders>{children}</AppProviders>
       </body>

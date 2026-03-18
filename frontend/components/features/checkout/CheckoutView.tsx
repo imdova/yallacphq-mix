@@ -35,6 +35,7 @@ import {
   PRODUCT,
   STORAGE_KEY,
   type CheckoutMode,
+  type StoredCheckoutPayload,
 } from "@/components/features/checkout/checkoutData";
 import { apiGet } from "@/lib/api/client";
 
@@ -264,6 +265,10 @@ export function CheckoutView() {
     courseIds: [] as string[],
     discountAmount: 0,
     promoCode: "",
+    studentName: "",
+    studentEmail: "",
+    studentPhone: "",
+    billingData: undefined as StoredCheckoutPayload["billingData"],
   });
 
   const isSingleCourseCheckout = !!directCourseId && !!directCourse;
@@ -303,6 +308,23 @@ export function CheckoutView() {
           : [],
       discountAmount,
       promoCode: discountCode.trim(),
+      studentName: fullName.trim(),
+      studentEmail: email.trim(),
+      studentPhone: `${countryCode.replace("-", "")}${phone.trim()}`,
+      billingData:
+        fullName.trim() && email.trim()
+          ? {
+              first_name: fullName.trim().split(/\s+/)[0] ?? fullName.trim(),
+              last_name:
+                fullName.trim().split(/\s+/).slice(1).join(" ") ||
+                fullName.trim().split(/\s+/)[0] ||
+                fullName.trim(),
+              email: email.trim(),
+              phone_number: `${countryCode.replace("-", "")}${phone.trim()}`,
+              city: "Cairo",
+              country: COUNTRY_CODE_TO_ISO3[countryCode] ?? "EGY",
+            }
+          : undefined,
     };
   }, [
     total,
@@ -313,6 +335,10 @@ export function CheckoutView() {
     courseIds,
     discountAmount,
     discountCode,
+    fullName,
+    email,
+    countryCode,
+    phone,
   ]);
 
   const applyPromo = async () => {
@@ -787,6 +813,9 @@ export function CheckoutView() {
                         method: "paymob",
                         paymobIntegrationType: paymobMethods.length > 0 ? paymobIntegrationType : undefined,
                         courseTitle: checkoutPayloadRef.current.courseTitle,
+                        studentName: fullName.trim(),
+                        studentEmail: email.trim(),
+                        studentPhone: `${countryCode.replace("-", "")}${phone.trim()}`,
                         currency: paymobCurrency,
                         amount: amountInPaymobCurrency,
                         discountAmount: discountAmount || undefined,

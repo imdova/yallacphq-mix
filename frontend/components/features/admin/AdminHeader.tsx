@@ -16,7 +16,7 @@ import {
   Settings,
   ShoppingBag,
   Ticket,
-  User,
+  User as UserIcon,
   Users,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -336,7 +336,7 @@ export function AdminHeader({ onOpenNav }: { onOpenNav?: () => void }) {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/admin/settings" className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900">
-                  <User className="h-4 w-4 shrink-0 text-zinc-500" />
+                  <UserIcon className="h-4 w-4 shrink-0 text-zinc-500" />
                   Profile
                 </Link>
               </DropdownMenuItem>

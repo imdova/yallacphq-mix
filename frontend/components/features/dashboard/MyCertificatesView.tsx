@@ -12,6 +12,7 @@ import {
   Medal,
   Trophy,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 
 function ProgressRing({
@@ -61,7 +62,7 @@ function MilestoneCard({
   active,
   disabled,
 }: {
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: LucideIcon;
   label: string;
   active?: boolean;
   disabled?: boolean;
@@ -112,7 +113,7 @@ export function MyCertificatesView() {
                 Certification Readiness
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-white/70">
-                You're just{" "}
+                You&apos;re just{" "}
                 <span className="font-semibold text-white">15%</span> away from being exam-ready!
                 Complete the{" "}
                 <span className="font-semibold text-white">Patient Safety</span>{" "}

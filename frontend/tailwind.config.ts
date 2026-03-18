@@ -68,8 +68,14 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        "home": ["var(--font-jakarta)", "var(--font-geist-sans)", "system-ui", "sans-serif"],
+        sans: ["var(--font-arabic)", "var(--font-geist-sans)", "system-ui", "sans-serif"],
+        "home": [
+          "var(--font-jakarta)",
+          "var(--font-arabic)",
+          "var(--font-geist-sans)",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: ["var(--font-geist-mono)", "monospace"],
         serif: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
       },

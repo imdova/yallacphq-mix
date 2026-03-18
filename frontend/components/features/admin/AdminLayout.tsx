@@ -20,6 +20,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   }, [status, user, router]);
 
+  React.useEffect(() => {
+    // Close mobile nav on route change inside /admin
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   if (status === "loading" || status === "idle") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50">
@@ -41,11 +46,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  React.useEffect(() => {
-    // Close mobile nav on route change inside /admin
-    setMobileNavOpen(false);
-  }, [pathname]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50">

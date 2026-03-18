@@ -48,6 +48,13 @@ export function LoginClient() {
     router.replace(destination);
   }, [router, searchParams, status, user?.role]);
 
+  React.useEffect(() => {
+    const queryEmail = searchParams.get("email");
+    if (queryEmail) {
+      setEmail(queryEmail);
+    }
+  }, [searchParams]);
+
   const loading = status === "loading" || redirecting;
   const oauthError = searchParams.get("oauth_error");
   const displayError = error ?? oauthError;

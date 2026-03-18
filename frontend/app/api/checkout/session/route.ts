@@ -66,22 +66,8 @@ export async function POST(req: Request) {
       if (!out.success) return jsonError(500, "Invalid response", { requestId });
       return jsonOk(out.data, { status: res.status === 201 ? 201 : 200, requestId });
     } catch (e) {
-      const err = e as Error & { cause?: { code?: string } };
-      const isConnectionRefused =
-        err.cause?.code === "ECONNREFUSED" ||
-        (err.message?.includes("fetch failed") ?? false);
-      console.error("[checkout/session]", {
-        requestId,
-        error: e,
-        backendUrl: getBackendUrl() || "(not set)",
-      });
-      return jsonError(
-        503,
-        isConnectionRefused
-          ? "Payment service unavailable. Ensure the backend server is running and BACKEND_URL points to it (e.g. http://localhost:3001)."
-          : "Checkout failed",
-        { requestId }
-      );
+      console.error("[checkout/session]", { requestId, error: e });
+      return jsonError(500, "Checkout failed", { requestId });
     }
   }
 

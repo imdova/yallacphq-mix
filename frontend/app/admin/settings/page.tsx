@@ -360,6 +360,7 @@ export default function AdminSettingsPage() {
     countries: [],
     specialities: [],
     categories: [],
+    quizCategories: [],
   });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   BadgeCheck,
   CheckCircle2,
@@ -13,6 +14,8 @@ import {
   ListVideo,
   Medal,
   PlayCircle,
+  Star,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,7 +49,7 @@ const FREE_LESSONS: FreeLesson[] = [
     partLabel: "Part 1",
     title: "Healthcare Quality Tools: Core Methodologies",
     durationLabel: "45 min",
-    youtubeId: "9JJYT8ajOKg",
+    youtubeId: "NS3oBUx_CBQ",
     description:
       "Master the essential tools most frequently tested on CPHQ—Lean basics, DMAIC, Root Cause Analysis, and rapid PDSA cycles—through real-world healthcare examples.",
     takeaways: [
@@ -65,7 +68,7 @@ const FREE_LESSONS: FreeLesson[] = [
     partLabel: "Part 2",
     title: "Patient Safety: From Incidents to Improvement",
     durationLabel: "32 min",
-    youtubeId: "9JJYT8ajOKg",
+    youtubeId: "ojMOtv1a0Zs",
     description:
       "Learn how to translate incidents into measurable improvements using safety culture, reporting systems, and high-reliability principles.",
     takeaways: [
@@ -80,7 +83,7 @@ const FREE_LESSONS: FreeLesson[] = [
     partLabel: "Part 3",
     title: "Performance Improvement: Choosing the Right Metric",
     durationLabel: "28 min",
-    youtubeId: "9JJYT8ajOKg",
+    youtubeId: "HkvR77Un6Rg",
     description:
       "A practical walkthrough of selecting process vs outcome measures, building dashboards, and interpreting variation with confidence.",
     takeaways: [
@@ -95,7 +98,7 @@ const FREE_LESSONS: FreeLesson[] = [
     partLabel: "Part 4",
     title: "Leadership & Strategy: Turning Plans Into Results",
     durationLabel: "30 min",
-    youtubeId: "9JJYT8ajOKg",
+    youtubeId: "6GVmLb942Sc",
     description:
       "Learn how quality leaders set priorities, align teams, and measure execution—so improvement work actually sticks.",
     takeaways: [
@@ -199,16 +202,6 @@ export function CphqFreeLectureViewer() {
   const nextLesson =
     activeIndex >= 0 && activeIndex < totalCount - 1 ? FREE_LESSONS[activeIndex + 1] : null;
 
-  const toggleComplete = () => {
-    if (!activeLesson) return;
-    setCompleted((prev) => {
-      const set = new Set(prev);
-      if (set.has(activeLesson.id)) set.delete(activeLesson.id);
-      else set.add(activeLesson.id);
-      return Array.from(set);
-    });
-  };
-
   const openLesson = (id: string) => {
     setActiveLessonId(id);
     setMobileLessonsOpen(false);
@@ -223,94 +216,75 @@ export function CphqFreeLectureViewer() {
 
   const PremiumEnrollmentSection = (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.5)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.22),transparent_55%)]" />
+      <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-5 shadow-lg ring-1 ring-amber-500/20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.15),transparent_50%)]" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-gold/90">
-            <Medal className="h-4 w-4 text-gold" aria-hidden />
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400">
+            <Medal className="h-4 w-4 text-amber-400" aria-hidden />
             Premium Enrollment
           </div>
 
           <p className="mt-3 text-xl font-bold tracking-tight text-white">
             Get the Full CPHQ Preparation Bundle
           </p>
-          <p className="mt-2 text-sm text-zinc-300">
+          <p className="mt-2 text-sm leading-relaxed text-zinc-300">
             Unlock 45+ hours of lectures, 1,200+ practice questions, and the complete study guide.
           </p>
 
-          <ul className="mt-4 space-y-2 text-sm text-zinc-200">
-            <li className="flex items-start gap-2">
-              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+          <ul className="mt-4 space-y-2.5 text-sm text-zinc-200">
+            <li className="flex items-start gap-2.5">
+              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden />
               <span>Comprehensive Exam Coverage</span>
             </li>
-            <li className="flex items-start gap-2">
-              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+            <li className="flex items-start gap-2.5">
+              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden />
               <span>Live Q&amp;A Mentorship Sessions</span>
             </li>
-            <li className="flex items-start gap-2">
-              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+            <li className="flex items-start gap-2.5">
+              <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden />
               <span>1-Year Full Platform Access</span>
             </li>
           </ul>
 
           <Button
             asChild
-            className="mt-5 h-12 w-full rounded-xl bg-[#F6D54A] font-bold uppercase tracking-wider text-zinc-900 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:bg-[#F6D54A]/90"
+            className="mt-5 h-12 w-full rounded-xl bg-gold font-bold text-zinc-900 shadow-md transition hover:bg-gold/90 hover:shadow-lg"
           >
             <Link href="/offers/cphq-offer">Enroll in full program</Link>
           </Button>
 
           <p className="mt-3 text-center text-xs text-zinc-400">
-            Limited time: Use code <span className="font-semibold text-gold">CPHQ25</span> for{" "}
-            <span className="font-semibold text-zinc-200">25% OFF</span>
+            Limited time: Use code <span className="font-semibold text-amber-300">CPHQ25</span> for{" "}
+            <span className="font-semibold text-white">25% OFF</span>
           </p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-gold/20 bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-gold/40 bg-zinc-900">
-            <img
-              src="/instructors/dr-ahmed-habib.png"
-              alt="Dr. Ahmed Habib"
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gold/90">
-              Instructor
-            </p>
-            <p className="mt-1 truncate text-sm font-semibold text-white">Dr. Ahmed Habib</p>
-            <p className="mt-0.5 text-xs text-zinc-300">
-              15 years Experience in Healthcare Quality Management
-            </p>
-          </div>
         </div>
       </div>
     </div>
   );
 
   const CompleteCourseCurriculumSection = (
-    <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+    <Card className="rounded-2xl border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-200/50">
       <CardContent className="p-6">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-900">Course Curriculum</h2>
+          <h2 className="text-lg font-bold text-zinc-900">Course Curriculum</h2>
           <p className="mt-1 text-sm text-zinc-500">
-            {FULL_COURSE_TOTALS.sections} Sections - {FULL_COURSE_TOTALS.lectures} Lectures,{" "}
+            {FULL_COURSE_TOTALS.sections} Sections · {FULL_COURSE_TOTALS.lectures} Lectures ·{" "}
             {FULL_COURSE_TOTALS.quizzes} Quizzes
           </p>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-2">
           {FULL_COURSE_CURRICULUM.map((section) => {
             const open = courseCurriculumOpenId === section.id;
             return (
-              <div key={section.id} className="rounded-xl bg-zinc-50 p-4">
+              <div
+                key={section.id}
+                className="overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50/80 transition"
+              >
                 <button
                   type="button"
                   onClick={() => setCourseCurriculumOpenId(open ? null : section.id)}
-                  className="flex w-full items-center justify-between gap-4 text-left"
+                  className="flex w-full items-center justify-between gap-4 p-4 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400"
                   aria-expanded={open}
                 >
                   <span className="text-sm font-semibold text-zinc-900">{section.title}</span>
@@ -319,19 +293,25 @@ export function CphqFreeLectureViewer() {
                       {section.lectureCount} {section.lectureCount === 1 ? "lecture" : "lectures"}
                     </span>
                     <ChevronDown
-                      className={cn("h-4 w-4 transition-transform", open ? "rotate-180" : "rotate-0")}
+                      className={cn(
+                        "h-4 w-4 shrink-0 transition-transform",
+                        open ? "rotate-180" : "rotate-0"
+                      )}
                       aria-hidden
                     />
                   </span>
                 </button>
 
                 {open ? (
-                  <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4">
+                  <div className="space-y-2 border-t border-zinc-200/80 bg-white/60 px-4 py-3">
                     {section.lectures.map((lecture) => (
-                      <div key={lecture.id} className="flex items-start justify-between gap-3">
+                      <div
+                        key={lecture.id}
+                        className="flex items-start justify-between gap-3 rounded-lg py-2"
+                      >
                         <p className="text-sm text-zinc-700">{lecture.title}</p>
                         {lecture.durationLabel ? (
-                          <span className="shrink-0 text-xs font-semibold text-zinc-500">
+                          <span className="shrink-0 text-xs font-medium text-zinc-500">
                             {lecture.durationLabel}
                           </span>
                         ) : null}
@@ -348,49 +328,61 @@ export function CphqFreeLectureViewer() {
   );
 
   const StudentFeedbackSection = (
-    <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+    <Card className="rounded-2xl border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-200/50">
       <CardContent className="p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gold">Students Feedback</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">
+              Students Feedback
+            </p>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-zinc-900">
               Proof that the program delivers results
             </h2>
-            <p className="mt-1 text-sm text-zinc-600">
-              Explore real student comments and short video testimonials that highlight the learning experience.
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600">
+              Real student comments and video testimonials from the learning experience.
             </p>
           </div>
-          <Button asChild variant="outline" className="h-10 rounded-xl border-zinc-200">
+          <Button
+            asChild
+            variant="outline"
+            className="h-10 shrink-0 rounded-xl border-zinc-200 bg-white shadow-sm hover:bg-zinc-50"
+          >
             <Link href="/offers/cphq-offer">See full program</Link>
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-50/80 p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-zinc-900">Images</p>
-                <p className="mt-1 text-xs text-zinc-500">A snapshot of real comments and success stories.</p>
+                <p className="mt-1 text-xs text-zinc-500">Real comments and success stories.</p>
               </div>
-              <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">Real reviews</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                Real reviews
+              </span>
             </div>
-            <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-              <img
+            <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+              <Image
                 src="/reviews/reviews-collage.png"
                 alt="Student feedback collage"
+                width={1200}
+                height={675}
                 className="h-auto w-full"
-                loading="lazy"
+                sizes="(max-width: 1024px) 100vw, 50vw"
               />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-50/80 p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-zinc-900">Videos</p>
-                <p className="mt-1 text-xs text-zinc-500">Hear directly from students—what changed after joining.</p>
+                <p className="mt-1 text-xs text-zinc-500">What changed after joining.</p>
               </div>
-              <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-zinc-100">Testimonials</span>
+              <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-semibold text-white">
+                Testimonials
+              </span>
             </div>
 
             <div className="mt-3 space-y-3">
@@ -406,8 +398,11 @@ export function CphqFreeLectureViewer() {
                   youtubeId: "9JJYT8ajOKg",
                 },
               ].map((v) => (
-                <div key={v.id} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                  <div className="relative aspect-[16/9] w-full bg-black">
+                <div
+                  key={v.id}
+                  className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md"
+                >
+                  <div className="relative aspect-video w-full bg-zinc-900">
                     <iframe
                       className="absolute inset-0 h-full w-full"
                       src={`https://www.youtube.com/embed/${v.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
@@ -419,7 +414,7 @@ export function CphqFreeLectureViewer() {
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-semibold text-zinc-900">{v.title}</p>
-                    <p className="mt-1 text-xs text-zinc-500">Short testimonial video</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">Short testimonial video</p>
                   </div>
                 </div>
               ))}
@@ -431,30 +426,35 @@ export function CphqFreeLectureViewer() {
   );
 
   const LessonsPanel = (
-    <Card className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+    <Card className="rounded-2xl border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-200/50">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Lessons</p>
-            <p className="mt-1 text-sm font-semibold text-zinc-900">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              Lessons
+            </p>
+            <p className="mt-1 text-sm font-bold text-zinc-900">
               {completedCount}/{totalCount} completed
             </p>
             {nextRecommended && progressPct < 100 ? (
               <p className="mt-1 text-xs text-zinc-500">
-                Next recommended:{" "}
-                <span className="font-semibold text-zinc-700">
+                Next:{" "}
+                <span className="font-semibold text-amber-700">
                   {formatLecturePart(nextRecommended.partLabel)}
                 </span>
               </p>
             ) : null}
           </div>
-          <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-semibold text-gold">
+          <span className="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-bold text-amber-800">
             {progressPct}%
           </span>
         </div>
 
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-200">
-          <div className="h-full rounded-full bg-gold" style={{ width: `${progressPct}%` }} />
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-zinc-200">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-gold transition-[width] duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
         </div>
 
         <div className="mt-5 space-y-2">
@@ -467,18 +467,19 @@ export function CphqFreeLectureViewer() {
                 type="button"
                 onClick={() => openLesson(lesson.id)}
                 className={cn(
-                  "w-full rounded-2xl border p-4 text-left transition",
+                  "w-full rounded-xl border p-3.5 text-left transition focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2",
                   isActive
-                    ? "border-gold/40 bg-gold/10"
-                    : "border-zinc-200 bg-white hover:bg-zinc-50"
+                    ? "border-amber-300 bg-amber-50 shadow-sm"
+                    : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
                 )}
                 aria-current={isActive ? "true" : undefined}
               >
                 <div className="flex items-start gap-3">
                   <span
                     className={cn(
-                      "mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                      isActive ? "bg-gold/15 text-gold" : "bg-zinc-100 text-zinc-500"
+                      "mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
+                      isActive ? "bg-amber-200/80 text-amber-800" : "bg-zinc-100 text-zinc-500",
+                      isDone && !isActive && "bg-emerald-100 text-emerald-600"
                     )}
                     aria-hidden
                   >
@@ -493,11 +494,13 @@ export function CphqFreeLectureViewer() {
                       <p className="truncate text-sm font-semibold text-zinc-900">
                         {formatLecturePart(lesson.partLabel)}
                       </p>
-                      <span className="shrink-0 text-xs font-semibold text-zinc-500">
+                      <span className="shrink-0 text-xs font-medium text-zinc-500">
                         {lesson.durationLabel}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{lesson.title}</p>
+                    <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-zinc-600">
+                      {lesson.title}
+                    </p>
                   </div>
                 </div>
               </button>
@@ -514,80 +517,73 @@ export function CphqFreeLectureViewer() {
   if (!activeLesson) return null;
 
   return (
-    <div className="bg-zinc-50/80">
-      <div className="container py-8 md:py-10">
+    <div
+      className="relative min-h-screen bg-zinc-950 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url(/free-lecture-bg.png)", backgroundAttachment: "fixed" }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-black/35" aria-hidden />
+      <div className="relative mx-auto w-full max-w-7xl px-2 py-6 sm:px-3 sm:py-8 md:py-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border border-zinc-700 bg-black px-4 py-2 text-left">
-              <ListVideo className="h-4 w-4 shrink-0 text-gold" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                  CPHQ Free Lecture
-                </p>
-                <p className="text-xs text-zinc-400">
-                  {formatLecturePart(activeLesson.partLabel)} of {totalCount}
-                </p>
-              </div>
+          <div className="flex min-w-0 flex-col items-center text-center sm:items-start sm:text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/90 px-4 py-2 shadow-sm" dir="rtl">
+              <ListVideo className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+              <p className="text-sm font-semibold text-amber-900">
+                محاضرة مجانية هتغير مستقبلك المهني في الرعاية الصحية
+              </p>
             </div>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl">
               {activeLesson.title}
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start sm:gap-3">
             <Sheet open={mobileLessonsOpen} onOpenChange={setMobileLessonsOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="h-10 rounded-xl border-zinc-200 lg:hidden">
+                <Button
+                  variant="outline"
+                  className="h-10 rounded-xl border-zinc-200 bg-white shadow-sm hover:bg-zinc-50 lg:hidden"
+                >
                   <ListVideo className="h-4 w-4" />
                   Lessons
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[320px] bg-zinc-50 p-4">
-                <div className="mt-4">{LessonsPanel}</div>
+              <SheetContent
+                side="right"
+                className="w-[320px] border-zinc-200 bg-zinc-50/95 p-5 backdrop-blur-sm"
+              >
+                <div className="mt-2">{LessonsPanel}</div>
               </SheetContent>
             </Sheet>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 rounded-xl border-zinc-200"
-              onClick={toggleComplete}
-            >
-              <CheckCircle2
-                className={cn("h-4 w-4", completedSet.has(activeLesson.id) && "text-emerald-600")}
-              />
-              {completedSet.has(activeLesson.id) ? "Completed" : "Mark complete"}
-            </Button>
           </div>
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
-            <Card className="overflow-hidden rounded-2xl border-zinc-200 bg-white shadow-sm">
-              <div className="relative aspect-[16/9] w-full bg-black">
+            <Card className="overflow-hidden rounded-2xl border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-200/50">
+              <div className="relative aspect-video w-full bg-zinc-900">
                 <iframe
                   className="absolute inset-0 h-full w-full"
-                  src={`https://www.youtube.com/embed/${activeLesson.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
+                  src={`https://www.youtube.com/embed/${activeLesson.youtubeId}?autoplay=1&mute=0&rel=0&modestbranding=1&playsinline=1`}
                   title={activeLesson.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"
                 />
               </div>
-              <div className="border-t border-zinc-200 p-4">
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                  <div className="text-sm text-zinc-600">
+              <div className="border-t border-zinc-100 bg-zinc-50/50 p-4">
+                <div className="flex flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
+                  <div className="text-sm text-zinc-600 md:order-1">
                     <span className="font-semibold text-zinc-900">
                       {formatLecturePart(activeLesson.partLabel)}
                     </span>{" "}
                     <span className="text-zinc-400">·</span> {activeLesson.durationLabel}
                   </div>
 
-                  <div className="flex justify-center gap-2">
+                  <div className="flex items-center justify-between gap-2 md:order-2 md:justify-center">
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-9 rounded-xl border-zinc-200"
+                      className="h-10 flex-1 rounded-xl border-zinc-200 bg-white shadow-sm transition hover:bg-zinc-50 md:flex-none"
                       onClick={() => prevLesson && openLesson(prevLesson.id)}
                       disabled={!prevLesson}
                     >
@@ -596,28 +592,34 @@ export function CphqFreeLectureViewer() {
                     </Button>
                     <Button
                       type="button"
-                      className="h-9 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                      className="h-10 flex-1 rounded-xl bg-gold text-gold-foreground shadow-sm transition hover:bg-gold/90 md:flex-none"
                       onClick={() => nextLesson && openLesson(nextLesson.id)}
                       disabled={!nextLesson}
                     >
                       Next
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-                  </div>
-
-                  <div className="flex justify-start sm:justify-end">
                     <Sheet open={resourcesOpen} onOpenChange={setResourcesOpen}>
                       <SheetTrigger asChild>
-                        <Button type="button" variant="outline" className="h-9 rounded-xl border-zinc-200">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 flex-1 rounded-xl border-zinc-200 bg-white shadow-sm transition hover:bg-zinc-50 md:flex-none"
+                        >
                           <Download className="h-4 w-4" />
                           Download Material
                         </Button>
                       </SheetTrigger>
-                      <SheetContent side="bottom" className="border-zinc-200 bg-zinc-50 p-4 sm:p-6">
-                        <div className="mx-auto w-full max-w-3xl space-y-4">
+                      <SheetContent
+                        side="bottom"
+                        className="border-t border-zinc-200 bg-white p-4 shadow-xl sm:p-6"
+                      >
+                        <div className="mx-auto w-full max-w-3xl space-y-5">
                           <div className="space-y-1">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Materials</p>
-                            <p className="text-lg font-semibold text-zinc-900">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                              Materials
+                            </p>
+                            <p className="text-lg font-bold text-zinc-900">
                               Download materials for {formatLecturePart(activeLesson.partLabel)}
                             </p>
                             <p className="text-sm text-zinc-600">{activeLesson.title}</p>
@@ -625,16 +627,27 @@ export function CphqFreeLectureViewer() {
 
                           <div className="grid gap-3 sm:grid-cols-2">
                             {activeLesson.resources.map((r) => (
-                              <Card key={r.label} className="rounded-2xl border-zinc-200 bg-white shadow-sm">
+                              <Card
+                                key={r.label}
+                                className="rounded-2xl border-zinc-200 bg-zinc-50/50 shadow-sm transition hover:shadow-md"
+                              >
                                 <CardContent className="flex items-center gap-3 p-4">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">
+                                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700 shadow-sm">
                                     <FileText className="h-5 w-5" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-zinc-900">{r.label}</p>
-                                    <p className="text-xs text-zinc-500">Download and study offline</p>
+                                    <p className="truncate text-sm font-semibold text-zinc-900">
+                                      {r.label}
+                                    </p>
+                                    <p className="text-xs text-zinc-500">
+                                      Download and study offline
+                                    </p>
                                   </div>
-                                  <Button asChild variant="outline" className="h-9 rounded-xl border-zinc-200">
+                                  <Button
+                                    asChild
+                                    variant="outline"
+                                    className="h-9 shrink-0 rounded-xl border-zinc-200 bg-white"
+                                  >
                                     <a href={r.href}>
                                       <Download className="h-4 w-4" />
                                       Download
@@ -652,6 +665,105 @@ export function CphqFreeLectureViewer() {
               </div>
             </Card>
 
+            <div className="overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-gold via-amber-50/30 to-gold shadow-[0_4px_24px_rgba(180,140,45,0.2)]">
+              <div className="p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+                  <div className="flex shrink-0 items-center justify-center sm:items-start">
+                    <div className="relative">
+                      <div className="relative h-[4rem] w-[4rem] overflow-hidden rounded-full shadow-lg ring-2 ring-white/60 ring-offset-2 ring-offset-amber-100/50 sm:h-[4.5rem] sm:w-[4.5rem]">
+                        <Image
+                          src="/instructors/dr-ahmed-habib.png"
+                          alt="Dr. Ahmed Habib"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 64px, 72px"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-900/70">
+                        Instructor
+                      </p>
+                      <h3 className="mt-0.5 text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">
+                        Dr. Ahmed Habib
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm">
+                        <Users className="h-3.5 w-3.5 text-amber-800" aria-hidden />
+                        1,345 enrolled
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Star
+                            key={i}
+                            className="h-3.5 w-3.5 fill-amber-600 text-amber-600"
+                            aria-hidden
+                          />
+                        ))}
+                        <span className="ml-0.5 font-semibold">5.0</span>
+                      </span>
+                    </div>
+                    <p className="border-t border-amber-200/50 pt-3 text-sm leading-relaxed text-white">
+                      15 years Experience in Healthcare Quality Management. I helped more than 2500
+                      medical students like ( Doctors, Dentists, Pharmacists, Nurses ) achieve
+                      Excellence and start a new career in Healthcare Quality in Egypt and GULF
+                      Region.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Outcomes / Result section */}
+            <section
+              dir="rtl"
+              className="relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/95 p-6 shadow-md ring-1 ring-zinc-200/50 backdrop-blur-sm sm:p-8"
+            >
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500 via-gold to-amber-500"
+                aria-hidden
+              />
+              <h2 className="text-center text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">
+                هتستفيد أيه لما تشترك في CPHQ Preparation Course
+              </h2>
+              <ul className="mt-6 space-y-3">
+                {[
+                  "تفهم منهج امتحان CPHQ (Domains) وتعرف الأولويات اللي فعلاً بتجيب درجات",
+                  "تتقن أدوات الجودة الأساسية (Lean, DMAIC, RCA, PDSA) وتطبقها على أمثلة واقعية",
+                  "تطبق مفاهيم سلامة المرضى وتحول الحوادث إلى تحسينات قابلة للقياس",
+                  "تختار المؤشرات الصح وتقرأ البيانات بثقة (Process vs Outcome + Variation)",
+                  "تقود مبادرات التحسين وتثبت النتائج (Strategy alignment + Change management)",
+                  "تجهز للاختبار بخطة مذاكرة + 45+ ساعة محاضرات و 1,200+ سؤال تدريبي",
+                ].map((text, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50/70 px-4 py-3.5 shadow-sm"
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+                      aria-hidden
+                    >
+                      <CheckCircle2 className="h-5 w-5" />
+                    </span>
+                    <span className="flex-1 text-sm font-medium leading-relaxed text-zinc-800">
+                      {text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8 flex justify-center">
+                <Button
+                  asChild
+                  className="h-12 min-w-[200px] rounded-xl bg-gold px-8 font-bold text-gold-foreground shadow-md transition hover:bg-gold/90 hover:shadow-lg"
+                >
+                  <Link href="/offers/cphq-offer">خصم 25% - ابدأ دلوقتي</Link>
+                </Button>
+              </div>
+            </section>
+
             {/* Mobile-only: show Premium Enrollment just below video */}
             <div className="lg:hidden">{PremiumEnrollmentSection}</div>
 
@@ -660,7 +772,7 @@ export function CphqFreeLectureViewer() {
             {StudentFeedbackSection}
           </div>
 
-          <aside className="hidden h-fit lg:sticky lg:top-24 lg:block">{LessonsPanel}</aside>
+          <aside className="hidden h-fit lg:sticky lg:top-6 lg:block">{LessonsPanel}</aside>
         </div>
       </div>
     </div>

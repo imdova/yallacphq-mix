@@ -24,23 +24,37 @@ const navLinks = [
   { href: "/#about", label: "About Us" },
 ];
 
-export function CoursesHeader() {
+type CoursesHeaderProps = {
+  variant?: "light" | "dark";
+};
+
+export function CoursesHeader({ variant = "light" }: CoursesHeaderProps) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const { courseIds } = useCart();
   const { user, status } = useAuth();
   const isLoggedIn = status === "authenticated" && !!user;
   const cartCount = courseIds.length;
+  const isDark = variant === "dark";
+  const logoSrc = isDark ? "/brand/logo-sidebar.png" : "/brand/logo-default.png";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full border-b backdrop-blur-sm",
+        isDark ? "border-white/10 bg-zinc-950/95" : "border-zinc-200/80 bg-white/95"
+      )}
+    >
       <div className="container flex h-14 items-center justify-between gap-4 px-4 md:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-zinc-900"
+          className={cn(
+            "flex items-center gap-2 text-lg font-semibold tracking-tight",
+            isDark ? "text-white" : "text-zinc-900"
+          )}
         >
           <Image
-            src="/brand/logo-default.png"
+            src={logoSrc}
             alt="Yalla CPHQ"
             width={220}
             height={48}
@@ -52,8 +66,11 @@ export function CoursesHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
-                "flex items-center gap-1 text-sm font-medium text-zinc-600 outline-none transition-colors hover:text-zinc-900",
-                pathname.startsWith("/offers") && "text-zinc-900"
+                "flex items-center gap-1 text-sm font-medium outline-none transition-colors",
+                isDark
+                  ? "text-white/80 hover:text-white"
+                  : "text-zinc-600 hover:text-zinc-900",
+                pathname.startsWith("/offers") && (isDark ? "text-white" : "text-zinc-900")
               )}
               aria-haspopup="true"
               aria-expanded={undefined}
@@ -75,8 +92,11 @@ export function CoursesHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
-                "flex items-center gap-1 text-sm font-medium text-zinc-600 outline-none transition-colors hover:text-zinc-900",
-                pathname.startsWith("/webinars") && "text-zinc-900"
+                "flex items-center gap-1 text-sm font-medium outline-none transition-colors",
+                isDark
+                  ? "text-white/80 hover:text-white"
+                  : "text-zinc-600 hover:text-zinc-900",
+                pathname.startsWith("/webinars") && (isDark ? "text-white" : "text-zinc-900")
               )}
               aria-haspopup="true"
               aria-expanded={undefined}
@@ -106,7 +126,14 @@ export function CoursesHeader() {
                 href={href}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-zinc-900",
-                  isActive ? "text-zinc-900" : "text-zinc-600"
+                  isDark ? "hover:text-white" : "hover:text-zinc-900",
+                  isActive
+                    ? isDark
+                      ? "text-white"
+                      : "text-zinc-900"
+                    : isDark
+                      ? "text-white/80"
+                      : "text-zinc-600"
                 )}
               >
                 {label}
@@ -119,7 +146,12 @@ export function CoursesHeader() {
             asChild
             variant="ghost"
             size="icon"
-            className="relative rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+            className={cn(
+              "relative rounded-lg",
+              isDark
+                ? "text-white/80 hover:bg-white/10 hover:text-white"
+                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+            )}
             aria-label={cartCount > 0 ? `Cart (${cartCount} items)` : "Cart"}
           >
             <Link href="/cart">
@@ -133,16 +165,23 @@ export function CoursesHeader() {
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon" className="text-zinc-600">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(isDark ? "text-white/80 hover:bg-white/10 hover:text-white" : "text-zinc-600")}
+              >
                 <Menu className="h-5 w-5" aria-label="Open menu" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="bg-white">
+            <SheetContent side="right" className={cn(isDark ? "border-white/10 bg-zinc-950 text-white" : "bg-white")}>
               <nav className="mt-8 flex flex-col gap-4" aria-label="Mobile">
                 <Link
                   href="/offers"
                   onClick={() => setOpen(false)}
-                  className="text-lg font-medium text-zinc-900 hover:text-gold"
+                  className={cn(
+                    "text-lg font-medium hover:text-gold",
+                    isDark ? "text-white" : "text-zinc-900"
+                  )}
                 >
                   Offers
                 </Link>
@@ -151,7 +190,10 @@ export function CoursesHeader() {
                     key={href}
                     href={href}
                     onClick={() => setOpen(false)}
-                    className="pl-4 text-base text-zinc-600 hover:text-gold"
+                    className={cn(
+                      "pl-4 text-base hover:text-gold",
+                      isDark ? "text-white/80" : "text-zinc-600"
+                    )}
                   >
                     {label}
                   </Link>
@@ -159,7 +201,10 @@ export function CoursesHeader() {
                 <Link
                   href="/webinars"
                   onClick={() => setOpen(false)}
-                  className="text-lg font-medium text-zinc-900 hover:text-gold"
+                  className={cn(
+                    "text-lg font-medium hover:text-gold",
+                    isDark ? "text-white" : "text-zinc-900"
+                  )}
                 >
                   Webinars
                 </Link>
@@ -168,7 +213,10 @@ export function CoursesHeader() {
                     key={href}
                     href={href}
                     onClick={() => setOpen(false)}
-                    className="pl-4 text-base text-zinc-600 hover:text-gold"
+                    className={cn(
+                      "pl-4 text-base hover:text-gold",
+                      isDark ? "text-white/80" : "text-zinc-600"
+                    )}
                   >
                     {label}
                   </Link>
@@ -178,7 +226,10 @@ export function CoursesHeader() {
                     key={href}
                     href={href}
                     onClick={() => setOpen(false)}
-                    className="text-lg font-medium text-zinc-900 hover:text-gold"
+                    className={cn(
+                      "text-lg font-medium hover:text-gold",
+                      isDark ? "text-white" : "text-zinc-900"
+                    )}
                   >
                     {label}
                   </Link>
@@ -187,7 +238,10 @@ export function CoursesHeader() {
                   <Link
                     href="/cart"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 text-zinc-600 hover:text-zinc-900"
+                    className={cn(
+                      "flex items-center gap-2 transition",
+                      isDark ? "text-white/80 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                    )}
                   >
                     <ShoppingCart className="h-5 w-5" />
                     Cart{cartCount > 0 ? ` (${cartCount})` : ""}
@@ -197,7 +251,12 @@ export function CoursesHeader() {
                       <Link
                         href={ROUTES.SIGNUP}
                         onClick={() => setOpen(false)}
-                        className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition",
+                          isDark
+                            ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
+                        )}
                       >
                         Sign Up
                       </Link>
@@ -229,7 +288,10 @@ export function CoursesHeader() {
             <div className="hidden items-center gap-4 md:flex">
               <Link
                 href={ROUTES.SIGNUP}
-                className="text-sm font-semibold text-zinc-700 transition-colors hover:text-zinc-900"
+                className={cn(
+                  "text-sm font-semibold transition-colors",
+                  isDark ? "text-white/80 hover:text-white" : "text-zinc-700 hover:text-zinc-900"
+                )}
               >
                 Sign Up
               </Link>

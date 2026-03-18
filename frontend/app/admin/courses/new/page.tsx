@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import type { Course } from "@/types/course";
 import { adminCourseCreateSchema } from "@/lib/validations/course";
-import { createCourse, fetchCourseById, fetchCourses, updateCourse } from "@/lib/dal/courses";
+import { createCourse, fetchCourseById, updateCourse } from "@/lib/dal/courses";
 import { getStudentFieldOptions } from "@/lib/dal/settings";
 import { uploadCourseImage } from "@/lib/dal/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,6 @@ import {
 import { FormField, FormInput, FormSelect } from "@/components/shared/forms";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -289,7 +288,6 @@ export default function AdminCourseNewPage() {
     null
   );
   const [seoKeywordInput, setSeoKeywordInput] = React.useState("");
-  const [availableCourses, setAvailableCourses] = React.useState<Course[]>([]);
   const [selectedRelatedCourseIds, setSelectedRelatedCourseIds] = React.useState<string[]>([]);
   const [reviewMediaItems, setReviewMediaItems] = React.useState<ReviewMediaFormItem[]>([]);
   const [curriculumQuery, setCurriculumQuery] = React.useState("");
@@ -324,9 +322,6 @@ export default function AdminCourseNewPage() {
         setCategoryOptions(list);
       })
       .catch(() => setCategoryOptions(FALLBACK_CATEGORIES));
-    fetchCourses()
-      .then((items) => setAvailableCourses(items))
-      .catch(() => setAvailableCourses([]));
   }, []);
 
   React.useEffect(() => {
@@ -435,6 +430,9 @@ export default function AdminCourseNewPage() {
 
   const curriculumQueryNormalized = curriculumQuery.trim().toLowerCase();
   const activeSectionItems = activeSection?.items ?? [];
+  const activeLectures = activeSectionItems.filter(
+    (item): item is CurriculumLecture => item.type === "lecture"
+  );
   const filteredActiveItems = curriculumQueryNormalized
     ? activeSectionItems.filter((item) =>
         String(item.title ?? "")
@@ -442,8 +440,6 @@ export default function AdminCourseNewPage() {
           .includes(curriculumQueryNormalized)
       )
     : activeSectionItems;
-  const activeLessonsCount = activeSectionItems.filter((i) => i.type === "lecture").length;
-  const activeQuizzesCount = activeSectionItems.filter((i) => i.type === "quiz").length;
   const activeSectionDisplayTitle = activeSection
     ? /^\s*module\s*\d+/i.test(activeSection.title)
       ? activeSection.title
@@ -641,15 +637,6 @@ export default function AdminCourseNewPage() {
     return newQuiz.id;
   };
 
-  const updateSection = (
-    sectionId: string,
-    updates: Partial<Pick<CurriculumSection, "title" | "description">>
-  ) => {
-    setCurriculumSections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, ...updates } : s))
-    );
-  };
-
   const updateLecture = (
     sectionId: string,
     lectureId: string,
@@ -686,11 +673,6 @@ export default function AdminCourseNewPage() {
           : s
       )
     );
-  };
-
-  const removeSection = (sectionId: string) => {
-    setCurriculumSections((prev) => prev.filter((s) => s.id !== sectionId));
-    if (expandedSectionId === sectionId) setExpandedSectionId(null);
   };
 
   const removeItem = (sectionId: string, itemId: string) => {
@@ -798,19 +780,6 @@ export default function AdminCourseNewPage() {
       );
     };
     reader.readAsDataURL(file);
-  };
-
-  const relatedCourseOptions = React.useMemo(
-    () => availableCourses.filter((course) => course.id !== editId),
-    [availableCourses, editId]
-  );
-
-  const toggleRelatedCourse = (courseIdToToggle: string, checked: boolean) => {
-    setSelectedRelatedCourseIds((prev) =>
-      checked
-        ? Array.from(new Set([...prev, courseIdToToggle]))
-        : prev.filter((id) => id !== courseIdToToggle)
-    );
   };
 
   const addReviewMediaItem = () => {

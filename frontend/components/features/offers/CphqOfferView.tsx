@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   BadgeCheck,
   BookOpen,
@@ -308,12 +309,13 @@ export function CphqOfferView() {
               <CardContent className="p-6">
                 <p className="text-xs font-semibold uppercase tracking-wider text-gold">Instructor</p>
                 <div className="mt-4 flex items-start gap-4">
-                  <div className="h-16 w-16 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
-                    <img
+                  <div className="relative h-16 w-16 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+                    <Image
                       src="/instructors/dr-ahmed-habib.png"
                       alt="Dr. Ahmed Habib"
-                      className="h-full w-full object-cover"
-                      loading="lazy"
+                      fill
+                      className="object-cover"
+                      sizes="64px"
                     />
                   </div>
                   <div className="min-w-0">
@@ -350,11 +352,13 @@ export function CphqOfferView() {
                     <p className="text-sm font-semibold text-zinc-900">Images</p>
                     <p className="mt-1 text-xs text-zinc-500">A snapshot of real comments and success stories.</p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                      <img
+                      <Image
                         src="/reviews/reviews-collage.png"
                         alt="Student feedback collage"
+                        width={1200}
+                        height={675}
                         className="h-auto w-full"
-                        loading="lazy"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
                       />
                     </div>
                   </div>

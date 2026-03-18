@@ -13,6 +13,7 @@ import {
 
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
 const PAYPAL_SCRIPT_ID = "paypal-checkout-sdk";
+const PAYPAL_PENDING_ORDER_STORAGE_KEY = "paypal_pending_order_id";
 
 declare global {
   interface Window {
@@ -39,7 +40,7 @@ export function CardPaymentView() {
   const [paypalReady, setPaypalReady] = React.useState(false);
   const [paypalApproveUrl, setPaypalApproveUrl] = React.useState<string | null>(null);
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
-  const pendingPayPalOrderRef = React.useRef<{ id: string } | null>(null);
+  const pendingPayPalOrderRef = React.useRef<{ id: string; nextPath?: string } | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const backHref =
     payload?.checkoutMode === "single_course" && payload.singleCourseId
@@ -80,6 +81,9 @@ export function CardPaymentView() {
           return createPaymentSession({
             method: "paypal",
             courseTitle: payload.courseTitle,
+            studentName: payload.studentName,
+            studentEmail: payload.studentEmail,
+            studentPhone: payload.studentPhone,
             currency: "USD",
             amount: payload.total,
             discountAmount: payload.discountAmount || undefined,
@@ -88,7 +92,11 @@ export function CardPaymentView() {
             courseIds: payload.courseIds?.length ? payload.courseIds : undefined,
           })
             .then((res) => {
-              pendingPayPalOrderRef.current = res.order;
+              localStorage.setItem(PAYPAL_PENDING_ORDER_STORAGE_KEY, res.order.id);
+              pendingPayPalOrderRef.current = {
+                id: res.order.id,
+                nextPath: res.postCheckoutNextPath,
+              };
               const origin = typeof window !== "undefined" ? window.location.origin : "";
               const cancelUrl =
                 payload.checkoutMode === "single_course" && payload.singleCourseId
@@ -102,7 +110,7 @@ export function CardPaymentView() {
                   },
                 ],
                 application_context: {
-                  return_url: `${origin}/checkout/paypal-return?our_order_id=${encodeURIComponent(res.order.id)}`,
+                  return_url: `${origin}/checkout/paypal-return?next=${encodeURIComponent(res.postCheckoutNextPath ?? "/dashboard/courses")}`,
                   cancel_url: cancelUrl,
                 },
               });
@@ -142,7 +150,7 @@ export function CardPaymentView() {
           }
           return confirmPayment({ orderId: order.id, transactionId: orderID })
             .then(() => {
-              router.push("/dashboard/orders?from=checkout");
+              router.push(order.nextPath ?? "/dashboard/orders?from=checkout");
             })
             .catch((err: unknown) => {
               setCheckoutError(

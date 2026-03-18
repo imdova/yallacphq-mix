@@ -10,8 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { Order } from "@/types/order";
 import { getOrderDisplayId } from "@/lib/order-display-id";
+import type { Order } from "@/types/order";
 import { Copy, ReceiptText } from "lucide-react";
 
 function formatCurrency(amount: number, currency: string) {
@@ -60,6 +60,7 @@ export function OrderDetailsModal({
   order: Order | null;
 }) {
   const net = order ? Math.max(0, order.amount - (order.discountAmount ?? 0)) : 0;
+  const displayId = order ? getOrderDisplayId(order) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,14 +74,14 @@ export function OrderDetailsModal({
             {order ? (
               <span className="inline-flex items-center gap-2">
                 <span>
-                  Order <span className="font-semibold text-zinc-800">{getOrderDisplayId(order)}</span>
+                  Order <span className="font-semibold text-zinc-800">{displayId}</span>
                 </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   className="h-8 w-8 rounded-xl border-zinc-200"
-                  onClick={() => void copyText(getOrderDisplayId(order))}
+                  onClick={() => void copyText(displayId ?? "")}
                   aria-label="Copy order ID"
                 >
                   <Copy className="h-4 w-4" />

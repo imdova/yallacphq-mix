@@ -23,8 +23,9 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   leadCreateBodySchema,
   leadSubmitResponseSchema,
+  webinarLeadCreateBodySchema,
 } from '../../contracts';
-import type { LeadCreateBody } from '../../contracts';
+import type { LeadCreateBody, WebinarLeadCreateBody } from '../../contracts';
 import {
   LeadCreateBodyDto,
   LeadSubmitResponseDto,
@@ -45,7 +46,7 @@ export class LeadsController {
   @ApiBody({ type: LeadCreateBodyDto })
   @ApiCreatedResponse({ type: LeadSubmitResponseDto })
   async create(@Body() body: LeadCreateBody) {
-    await this.leads.create(body);
+    await this.leads.create({ ...body, source: 'general' });
     return { success: true };
   }
 
@@ -57,18 +58,22 @@ export class LeadsController {
   @ApiBody({ type: LeadCreateBodyDto })
   @ApiCreatedResponse({ type: LeadSubmitResponseDto })
   createCphq(@Body() body: LeadCreateBody) {
-    return this.create(body);
+    return this.leads.create({ ...body, source: 'cphq' }).then(() => ({
+      success: true,
+    }));
   }
 
   @Post('webinar')
   @Version('1')
-  @UsePipes(new ZodValidationPipe(leadCreateBodySchema))
+  @UsePipes(new ZodValidationPipe(webinarLeadCreateBodySchema))
   @ResponseSchema(leadSubmitResponseSchema)
   @ApiOperation({ summary: 'Submit webinar lead (contract route)' })
   @ApiBody({ type: LeadCreateBodyDto })
   @ApiCreatedResponse({ type: LeadSubmitResponseDto })
-  createWebinar(@Body() body: LeadCreateBody) {
-    return this.create(body);
+  createWebinar(@Body() body: WebinarLeadCreateBody) {
+    return this.leads.create({ ...body, source: 'webinar' }).then(() => ({
+      success: true,
+    }));
   }
 
   @Get()

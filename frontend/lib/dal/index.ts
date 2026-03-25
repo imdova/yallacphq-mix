@@ -14,6 +14,8 @@ export * from "./user";
 export * from "./task";
 export * from "./courses";
 export * from "./promo-codes";
+export * from "./quizzes";
 export * from "./orders";
 export * from "./auth";
 export * from "./leads";
+export * from "./webinars";

@@ -16,6 +16,27 @@ export class LeadCreateBodyDto {
     example: 'Quality Improvement',
   })
   specialty?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Optional webinar id for webinar registrations',
+    example: '67d7f4f2c0db52c8f0ce1234',
+  })
+  webinarId?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Optional webinar slug for webinar registrations',
+    example: 'master-cphq-in-60-minutes',
+  })
+  webinarSlug?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Optional webinar title for webinar registrations',
+    example: 'Master CPHQ in 60 Minutes',
+  })
+  webinarTitle?: string;
 }
 
 export class LeadSubmitResponseDto {

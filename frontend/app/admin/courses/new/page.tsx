@@ -8,8 +8,10 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import type { Course } from "@/types/course";
+import type { AdminStoredQuiz } from "@/types/quiz";
 import { adminCourseCreateSchema } from "@/lib/validations/course";
 import { createCourse, fetchCourseById, updateCourse } from "@/lib/dal/courses";
+import { getAdminQuizzes } from "@/lib/dal/quizzes";
 import { getStudentFieldOptions } from "@/lib/dal/settings";
 import { uploadCourseImage } from "@/lib/dal/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,17 +86,6 @@ const CERTIFICATION_OPTIONS = [
   { value: "Micro-Credential", label: "Micro-Credential" },
 ] as const;
 
-const READY_MADE_QUIZZES = [
-  "Module Quiz",
-  "Knowledge Check",
-  "Practice Quiz",
-  "CPHQ Practice Quiz",
-  "Assessment",
-  "Final Quiz",
-  "Section Review",
-  "Self-Assessment",
-];
-
 function nextId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -116,6 +107,7 @@ export interface CurriculumQuiz {
   id: string;
   type: "quiz";
   title: string;
+  quizId?: string;
 }
 
 export type CurriculumItem = CurriculumLecture | CurriculumQuiz;
@@ -168,6 +160,7 @@ function mapCurriculumSections(course: Course): CurriculumSection[] {
             id: item.id,
             type: "quiz" as const,
             title: item.title,
+            quizId: item.quizId,
           }
     ),
   }));
@@ -205,6 +198,7 @@ function serializeCurriculumSections(sections: CurriculumSection[]) {
                 id: item.id,
                 type: "quiz" as const,
                 title: item.title.trim(),
+                quizId: item.quizId?.trim() || undefined,
               }
         )
         .filter((item) => item.title.length > 0),
@@ -284,6 +278,8 @@ export default function AdminCourseNewPage() {
   const [expandedSectionId, setExpandedSectionId] = React.useState<string | null>(null);
   const [expandedLectureIds, setExpandedLectureIds] = React.useState<Set<string>>(new Set());
   const [expandedQuizIds, setExpandedQuizIds] = React.useState<Set<string>>(new Set());
+  const [availableQuizzes, setAvailableQuizzes] = React.useState<AdminStoredQuiz[]>([]);
+  const [quizLoadError, setQuizLoadError] = React.useState<string | null>(null);
   const [materialUploadForLectureId, setMaterialUploadForLectureId] = React.useState<string | null>(
     null
   );
@@ -304,7 +300,7 @@ export default function AdminCourseNewPage() {
   const [addLessonSectionId, setAddLessonSectionId] = React.useState<string | null>(null);
   const [addQuizSectionId, setAddQuizSectionId] = React.useState<string | null>(null);
 
-  const [draftQuizTitle, setDraftQuizTitle] = React.useState("");
+  const [draftQuizId, setDraftQuizId] = React.useState("");
   const [materialLectureId, setMaterialLectureId] = React.useState<string>("");
   const [materialUrlDraft, setMaterialUrlDraft] = React.useState("");
   const [draggingCurriculumItemId, setDraggingCurriculumItemId] = React.useState<string | null>(
@@ -325,6 +321,18 @@ export default function AdminCourseNewPage() {
   }, []);
 
   React.useEffect(() => {
+    getAdminQuizzes()
+      .then((items) => {
+        setAvailableQuizzes(items);
+        setQuizLoadError(null);
+      })
+      .catch(() => {
+        setAvailableQuizzes([]);
+        setQuizLoadError("Couldn’t load quizzes. Create quizzes first, then link them to the course.");
+      });
+  }, []);
+
+  React.useEffect(() => {
     if (!expandedSectionId && curriculumSections.length > 0) {
       setExpandedSectionId(curriculumSections[0].id);
     }
@@ -338,7 +346,7 @@ export default function AdminCourseNewPage() {
     setDraftLessonVideoUrl("");
     setDraftLessonDescription("");
     setDraftLessonThumbName("");
-    setDraftQuizTitle("");
+    setDraftQuizId("");
     setMaterialUrlDraft("");
   }, [expandedSectionId]);
 
@@ -477,6 +485,11 @@ export default function AdminCourseNewPage() {
         return `Module ${number}: ${cleaned}`.toUpperCase();
       })()
     : "";
+  const availableQuizMap = React.useMemo(
+    () => new Map(availableQuizzes.map((quiz) => [quiz.id, quiz])),
+    [availableQuizzes]
+  );
+  const selectedDraftQuiz = draftQuizId ? availableQuizMap.get(draftQuizId) ?? null : null;
 
   const openAddQuizModal = (sectionId: string) => {
     setAddQuizSectionId(sectionId);
@@ -484,6 +497,7 @@ export default function AdminCourseNewPage() {
 
   const closeAddQuizModal = () => {
     setAddQuizSectionId(null);
+    setDraftQuizId("");
   };
   React.useEffect(() => {
     if (categoryOptions.length > 0 && currentTag && !categoryOptions.includes(currentTag)) {
@@ -622,7 +636,10 @@ export default function AdminCourseNewPage() {
     return newLecture.id;
   };
 
-  const addQuiz = (sectionId: string, updates?: Partial<Pick<CurriculumQuiz, "title">>) => {
+  const addQuiz = (
+    sectionId: string,
+    updates?: Partial<Pick<CurriculumQuiz, "title" | "quizId">>
+  ) => {
     const section = curriculumSections.find((s) => s.id === sectionId);
     if (!section) return;
     const quizCount = section.items.filter((i) => i.type === "quiz").length + 1;
@@ -630,6 +647,7 @@ export default function AdminCourseNewPage() {
       id: nextId(),
       type: "quiz",
       title: updates?.title?.trim() ? updates.title.trim() : `Quiz ${quizCount}`,
+      quizId: updates?.quizId,
     };
     setCurriculumSections((prev) =>
       prev.map((s) => (s.id === sectionId ? { ...s, items: [...s.items, newQuiz] } : s))
@@ -659,7 +677,7 @@ export default function AdminCourseNewPage() {
   const updateQuiz = (
     sectionId: string,
     quizId: string,
-    updates: Partial<Pick<CurriculumQuiz, "title">>
+    updates: Partial<Pick<CurriculumQuiz, "title" | "quizId">>
   ) => {
     setCurriculumSections((prev) =>
       prev.map((s) =>
@@ -1779,12 +1797,22 @@ export default function AdminCourseNewPage() {
                                             {isQuizExpandedList ? (
                                               <div className="space-y-4 border-t border-zinc-200 bg-zinc-50/50 p-4">
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                                  <p className="text-sm text-zinc-600">
-                                                    Current:{" "}
-                                                    <span className="font-semibold text-zinc-900">
-                                                      {quiz.title}
-                                                    </span>
-                                                  </p>
+                                                  <div className="space-y-1">
+                                                    <p className="text-sm text-zinc-600">
+                                                      Display title:{" "}
+                                                      <span className="font-semibold text-zinc-900">
+                                                        {quiz.title}
+                                                      </span>
+                                                    </p>
+                                                    <p className="text-xs text-zinc-500">
+                                                      Linked quiz:{" "}
+                                                      <span className="font-semibold text-zinc-700">
+                                                        {quiz.quizId
+                                                          ? availableQuizMap.get(quiz.quizId)?.title ?? "Linked quiz"
+                                                          : "Not linked yet"}
+                                                      </span>
+                                                    </p>
+                                                  </div>
                                                   <Button
                                                     type="button"
                                                     variant="outline"
@@ -1799,62 +1827,102 @@ export default function AdminCourseNewPage() {
                                                     Remove quiz
                                                   </Button>
                                                 </div>
-                                                <div className="space-y-2">
-                                                  <label className="text-sm font-medium text-zinc-700">
-                                                    Select from ready-made quizzes
-                                                  </label>
-                                                  <div className="relative">
-                                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                                                    <input
-                                                      type="text"
-                                                      value={quizEditSearch[quiz.id] ?? ""}
-                                                      onChange={(e) =>
-                                                        setQuizEditSearch((prev) => ({
-                                                          ...prev,
-                                                          [quiz.id]: e.target.value,
-                                                        }))
-                                                      }
-                                                      placeholder="Search quizzes..."
-                                                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                                                    />
+                                                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                                                  <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-zinc-700">
+                                                      Link a saved quiz
+                                                    </label>
+                                                    <div className="relative">
+                                                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                                      <input
+                                                        type="text"
+                                                        value={quizEditSearch[quiz.id] ?? ""}
+                                                        onChange={(e) =>
+                                                          setQuizEditSearch((prev) => ({
+                                                            ...prev,
+                                                            [quiz.id]: e.target.value,
+                                                          }))
+                                                        }
+                                                        placeholder="Search saved quizzes..."
+                                                        className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                      />
+                                                    </div>
+                                                    {quizLoadError ? (
+                                                      <p className="text-xs text-rose-600">{quizLoadError}</p>
+                                                    ) : availableQuizzes.length === 0 ? (
+                                                      <div className="rounded-xl border border-dashed border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500">
+                                                        No saved quizzes yet. Create a quiz first, then link it here.
+                                                      </div>
+                                                    ) : (
+                                                      <div className="grid max-h-48 gap-1.5 overflow-y-auto">
+                                                        {availableQuizzes
+                                                          .filter((savedQuiz) => {
+                                                            const query = (quizEditSearch[quiz.id] ?? "").trim().toLowerCase();
+                                                            return (
+                                                              !query ||
+                                                              savedQuiz.title.toLowerCase().includes(query) ||
+                                                              savedQuiz.category.toLowerCase().includes(query)
+                                                            );
+                                                          })
+                                                          .map((savedQuiz) => (
+                                                            <button
+                                                              key={savedQuiz.id}
+                                                              type="button"
+                                                              onClick={() => {
+                                                                updateQuiz(section.id, quiz.id, {
+                                                                  title: savedQuiz.title,
+                                                                  quizId: savedQuiz.id,
+                                                                });
+                                                                setQuizEditSearch((prev) => {
+                                                                  const next = { ...prev };
+                                                                  delete next[quiz.id];
+                                                                  return next;
+                                                                });
+                                                              }}
+                                                              className={cn(
+                                                                "flex items-start gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                                                quiz.quizId === savedQuiz.id
+                                                                  ? "border-gold bg-gold/10 text-zinc-900"
+                                                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                                                              )}
+                                                            >
+                                                              <FileQuestion className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                                                              <div className="min-w-0">
+                                                                <p className="font-medium text-zinc-900">
+                                                                  {savedQuiz.title}
+                                                                </p>
+                                                                <p className="text-xs text-zinc-500">
+                                                                  {savedQuiz.questions} questions
+                                                                </p>
+                                                              </div>
+                                                            </button>
+                                                          ))}
+                                                      </div>
+                                                    )}
                                                   </div>
-                                                  <div className="grid max-h-40 gap-1.5 overflow-y-auto">
-                                                    {(quizEditSearch[quiz.id]
-                                                      ? READY_MADE_QUIZZES.filter((q) =>
-                                                          q
-                                                            .toLowerCase()
-                                                            .includes(
-                                                              (
-                                                                quizEditSearch[quiz.id] ?? ""
-                                                              ).toLowerCase()
-                                                            )
-                                                        )
-                                                      : READY_MADE_QUIZZES
-                                                    ).map((title) => (
-                                                      <button
-                                                        key={title}
-                                                        type="button"
-                                                        onClick={() => {
-                                                          updateQuiz(section.id, quiz.id, {
-                                                            title,
-                                                          });
-                                                          setQuizEditSearch((prev) => {
-                                                            const next = { ...prev };
-                                                            delete next[quiz.id];
-                                                            return next;
-                                                          });
-                                                        }}
-                                                        className={cn(
-                                                          "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
-                                                          quiz.title === title
-                                                            ? "border-gold bg-gold/10 text-zinc-900"
-                                                            : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
-                                                        )}
-                                                      >
-                                                        <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" />
-                                                        {title}
-                                                      </button>
-                                                    ))}
+                                                  <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-zinc-700">
+                                                      Selected quiz
+                                                    </label>
+                                                    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm">
+                                                      {quiz.quizId && availableQuizMap.get(quiz.quizId) ? (
+                                                        <>
+                                                          <p className="font-semibold text-zinc-900">
+                                                            {availableQuizMap.get(quiz.quizId)?.title}
+                                                          </p>
+                                                          <p className="mt-1 text-zinc-500">
+                                                            {availableQuizMap.get(quiz.quizId)?.questions} questions
+                                                          </p>
+                                                          <p className="mt-1 text-xs text-zinc-500">
+                                                            ID: {quiz.quizId}
+                                                          </p>
+                                                        </>
+                                                      ) : (
+                                                        <p className="text-zinc-500">
+                                                          Select a saved quiz to connect this course item to real questions.
+                                                        </p>
+                                                      )}
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -2193,12 +2261,22 @@ export default function AdminCourseNewPage() {
                                           {isQuizExpanded ? (
                                             <div className="space-y-4 border-t border-zinc-200 bg-zinc-50/50 p-4">
                                               <div className="flex flex-wrap items-center justify-between gap-3">
-                                                <p className="text-sm text-zinc-600">
-                                                  Current:{" "}
-                                                  <span className="font-semibold text-zinc-900">
-                                                    {item.title}
-                                                  </span>
-                                                </p>
+                                                <div className="space-y-1">
+                                                  <p className="text-sm text-zinc-600">
+                                                    Display title:{" "}
+                                                    <span className="font-semibold text-zinc-900">
+                                                      {item.title}
+                                                    </span>
+                                                  </p>
+                                                  <p className="text-xs text-zinc-500">
+                                                    Linked quiz:{" "}
+                                                    <span className="font-semibold text-zinc-700">
+                                                      {item.quizId
+                                                        ? availableQuizMap.get(item.quizId)?.title ?? "Linked quiz"
+                                                        : "Not linked yet"}
+                                                    </span>
+                                                  </p>
+                                                </div>
                                                 <Button
                                                   type="button"
                                                   variant="outline"
@@ -2213,62 +2291,102 @@ export default function AdminCourseNewPage() {
                                                   Remove quiz
                                                 </Button>
                                               </div>
-                                              <div className="space-y-2">
-                                                <label className="text-sm font-medium text-zinc-700">
-                                                  Select from ready-made quizzes
-                                                </label>
-                                                <div className="relative">
-                                                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                                                  <input
-                                                    type="text"
-                                                    value={quizEditSearch[item.id] ?? ""}
-                                                    onChange={(e) =>
-                                                      setQuizEditSearch((prev) => ({
-                                                        ...prev,
-                                                        [item.id]: e.target.value,
-                                                      }))
-                                                    }
-                                                    placeholder="Search quizzes..."
-                                                    className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                                                  />
+                                              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                                                <div className="space-y-2">
+                                                  <label className="text-sm font-medium text-zinc-700">
+                                                    Link a saved quiz
+                                                  </label>
+                                                  <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                                                    <input
+                                                      type="text"
+                                                      value={quizEditSearch[item.id] ?? ""}
+                                                      onChange={(e) =>
+                                                        setQuizEditSearch((prev) => ({
+                                                          ...prev,
+                                                          [item.id]: e.target.value,
+                                                        }))
+                                                      }
+                                                      placeholder="Search saved quizzes..."
+                                                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
+                                                    />
+                                                  </div>
+                                                  {quizLoadError ? (
+                                                    <p className="text-xs text-rose-600">{quizLoadError}</p>
+                                                  ) : availableQuizzes.length === 0 ? (
+                                                    <div className="rounded-xl border border-dashed border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500">
+                                                      No saved quizzes yet. Create a quiz first, then link it here.
+                                                    </div>
+                                                  ) : (
+                                                    <div className="grid max-h-48 gap-1.5 overflow-y-auto">
+                                                      {availableQuizzes
+                                                        .filter((savedQuiz) => {
+                                                          const query = (quizEditSearch[item.id] ?? "").trim().toLowerCase();
+                                                          return (
+                                                            !query ||
+                                                            savedQuiz.title.toLowerCase().includes(query) ||
+                                                            savedQuiz.category.toLowerCase().includes(query)
+                                                          );
+                                                        })
+                                                        .map((savedQuiz) => (
+                                                          <button
+                                                            key={savedQuiz.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                              updateQuiz(activeSection.id, item.id, {
+                                                                title: savedQuiz.title,
+                                                                quizId: savedQuiz.id,
+                                                              });
+                                                              setQuizEditSearch((prev) => {
+                                                                const next = { ...prev };
+                                                                delete next[item.id];
+                                                                return next;
+                                                              });
+                                                            }}
+                                                            className={cn(
+                                                              "flex items-start gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                                                              item.quizId === savedQuiz.id
+                                                                ? "border-gold bg-gold/10 text-zinc-900"
+                                                                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                                                            )}
+                                                          >
+                                                            <FileQuestion className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                                                            <div className="min-w-0">
+                                                              <p className="font-medium text-zinc-900">
+                                                                {savedQuiz.title}
+                                                              </p>
+                                                              <p className="text-xs text-zinc-500">
+                                                                {savedQuiz.questions} questions
+                                                              </p>
+                                                            </div>
+                                                          </button>
+                                                        ))}
+                                                    </div>
+                                                  )}
                                                 </div>
-                                                <div className="grid max-h-40 gap-1.5 overflow-y-auto">
-                                                  {(quizEditSearch[item.id]
-                                                    ? READY_MADE_QUIZZES.filter((q) =>
-                                                        q
-                                                          .toLowerCase()
-                                                          .includes(
-                                                            (
-                                                              quizEditSearch[item.id] ?? ""
-                                                            ).toLowerCase()
-                                                          )
-                                                      )
-                                                    : READY_MADE_QUIZZES
-                                                  ).map((title) => (
-                                                    <button
-                                                      key={title}
-                                                      type="button"
-                                                      onClick={() => {
-                                                        updateQuiz(activeSection.id, item.id, {
-                                                          title,
-                                                        });
-                                                        setQuizEditSearch((prev) => {
-                                                          const next = { ...prev };
-                                                          delete next[item.id];
-                                                          return next;
-                                                        });
-                                                      }}
-                                                      className={cn(
-                                                        "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
-                                                        item.title === title
-                                                          ? "border-gold bg-gold/10 text-zinc-900"
-                                                          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
-                                                      )}
-                                                    >
-                                                      <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" />
-                                                      {title}
-                                                    </button>
-                                                  ))}
+                                                <div className="space-y-2">
+                                                  <label className="text-sm font-medium text-zinc-700">
+                                                    Selected quiz
+                                                  </label>
+                                                  <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm">
+                                                    {item.quizId && availableQuizMap.get(item.quizId) ? (
+                                                      <>
+                                                        <p className="font-semibold text-zinc-900">
+                                                          {availableQuizMap.get(item.quizId)?.title}
+                                                        </p>
+                                                        <p className="mt-1 text-zinc-500">
+                                                          {availableQuizMap.get(item.quizId)?.questions} questions
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-zinc-500">
+                                                          ID: {item.quizId}
+                                                        </p>
+                                                      </>
+                                                    ) : (
+                                                      <p className="text-zinc-500">
+                                                        Select a saved quiz to connect this course item to real questions.
+                                                      </p>
+                                                    )}
+                                                  </div>
                                                 </div>
                                               </div>
                                             </div>
@@ -2422,15 +2540,33 @@ export default function AdminCourseNewPage() {
                                   <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm">
                                     <div className="space-y-1.5">
                                       <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                        Quiz title
+                                        Select saved quiz
                                       </label>
-                                      <input
-                                        type="text"
-                                        value={draftQuizTitle}
-                                        onChange={(e) => setDraftQuizTitle(e.target.value)}
-                                        placeholder="e.g. Knowledge Check"
+                                      <select
+                                        value={draftQuizId}
+                                        onChange={(e) => setDraftQuizId(e.target.value)}
                                         className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
-                                      />
+                                      >
+                                        <option value="">Choose a quiz…</option>
+                                        {availableQuizzes.map((quiz) => (
+                                          <option key={quiz.id} value={quiz.id}>
+                                            {quiz.title}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {quizLoadError ? (
+                                        <p className="text-xs text-rose-600">{quizLoadError}</p>
+                                      ) : null}
+                                      {selectedDraftQuiz ? (
+                                        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">
+                                          <p className="font-semibold text-zinc-900">
+                                            {selectedDraftQuiz.title}
+                                          </p>
+                                          <p className="mt-1 text-zinc-500">
+                                            {selectedDraftQuiz.questions} questions
+                                          </p>
+                                        </div>
+                                      ) : null}
                                     </div>
 
                                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
@@ -2438,16 +2574,21 @@ export default function AdminCourseNewPage() {
                                         type="button"
                                         variant="outline"
                                         className="h-10 rounded-xl border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-                                        onClick={() => setDraftQuizTitle("")}
+                                        onClick={() => setDraftQuizId("")}
                                       >
                                         Cancel
                                       </Button>
                                       <Button
                                         type="button"
                                         className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
+                                        disabled={!selectedDraftQuiz}
                                         onClick={() => {
-                                          addQuiz(activeSection.id, { title: draftQuizTitle });
-                                          setDraftQuizTitle("");
+                                          if (!selectedDraftQuiz) return;
+                                          addQuiz(activeSection.id, {
+                                            title: selectedDraftQuiz.title,
+                                            quizId: selectedDraftQuiz.id,
+                                          });
+                                          setDraftQuizId("");
                                           setPreviewMode(true);
                                         }}
                                       >
@@ -2840,26 +2981,40 @@ export default function AdminCourseNewPage() {
 
                 <div className="bg-white px-6 py-6">
                   <p className="mb-4 text-sm text-zinc-600">
-                    Select a ready-made quiz to add to this module.
+                    Select a saved quiz to add to this module.
                   </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {READY_MADE_QUIZZES.map((title) => (
-                      <button
-                        key={title}
-                        type="button"
-                        onClick={() => {
-                          if (!addQuizSectionId) return;
-                          addQuiz(addQuizSectionId, { title });
-                          closeAddQuizModal();
-                          setPreviewMode(true);
-                        }}
-                        className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:border-gold/50 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-gold/30"
-                      >
-                        <FileQuestion className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-                        {title}
-                      </button>
-                    ))}
-                  </div>
+                  {quizLoadError ? (
+                    <p className="text-sm text-rose-600">{quizLoadError}</p>
+                  ) : availableQuizzes.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-5 text-sm text-zinc-500">
+                      No saved quizzes yet. Create quizzes first, then come back to link them here.
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {availableQuizzes.map((quiz) => (
+                        <button
+                          key={quiz.id}
+                          type="button"
+                          onClick={() => {
+                            if (!addQuizSectionId) return;
+                            addQuiz(addQuizSectionId, {
+                              title: quiz.title,
+                              quizId: quiz.id,
+                            });
+                            closeAddQuizModal();
+                            setPreviewMode(true);
+                          }}
+                          className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:border-gold/50 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-gold/30"
+                        >
+                          <FileQuestion className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                          <div className="min-w-0">
+                            <p>{quiz.title}</p>
+                            <p className="mt-1 text-xs text-zinc-500">{quiz.questions} questions</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>

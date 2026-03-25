@@ -17,10 +17,12 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PromoCodesModule } from './modules/promo-codes/promo-codes.module';
+import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UsersModule } from './modules/users/users.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebinarsModule } from './modules/webinars/webinars.module';
 import { randomUUID } from 'crypto';
 
 function getRequestId(req: unknown): string | undefined {
@@ -101,11 +103,13 @@ function getReqBasics(req: unknown): { method?: string; url?: string } {
     OrdersModule,
     PaymentsModule,
     PromoCodesModule,
+    QuizzesModule,
     LeadsModule,
     SettingsModule,
     UploadModule,
     AdminModule,
     NotificationsModule,
+    WebinarsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

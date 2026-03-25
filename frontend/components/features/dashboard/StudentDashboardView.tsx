@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { getMyCourses } from "@/lib/dal/courses";
+import { getCourseLearningSummary } from "@/lib/course-learning";
 import type { Course } from "@/types/course";
 
 const stats = [
@@ -61,14 +62,29 @@ export function StudentDashboardView() {
 
   const displayName = user?.name ?? "there";
   const firstCourse = courses[0];
+  const firstCourseLearning = React.useMemo(
+    () => (firstCourse ? getCourseLearningSummary(firstCourse) : null),
+    [firstCourse]
+  );
+  const continueHref = firstCourseLearning?.defaultLaunch?.href ?? "/dashboard/courses";
+  const continueLabel = firstCourseLearning?.firstLesson
+    ? "Resume"
+    : firstCourseLearning?.firstQuiz
+      ? "Start quiz"
+      : "View courses";
   const coursesPreview = React.useMemo(
     () =>
-      courses.slice(0, 3).map((c) => ({
-        id: c.id,
-        title: c.title,
-        nextLesson: "Continue learning",
-        progress: 0,
-      })),
+      courses.slice(0, 3).map((course) => {
+        const learning = getCourseLearningSummary(course);
+        return {
+          id: course.id,
+          title: course.title,
+          nextItem: learning.firstLesson?.title ?? learning.firstQuiz?.title ?? "Continue learning",
+          progress: 0,
+          href: learning.defaultLaunch?.href ?? `/dashboard/courses/lesson?course=${course.id}`,
+          quizCount: learning.quizCount,
+        };
+      }),
     [courses]
   );
 
@@ -106,9 +122,11 @@ export function StudentDashboardView() {
           </p>
         </div>
         <Button asChild className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90">
-          <Link href="/dashboard/courses/lesson" className="inline-flex items-center gap-2">
+          <Link href={continueHref} className="inline-flex items-center gap-2">
             <Play className="h-4 w-4" />
-            Continue learning
+            {firstCourseLearning?.firstQuiz && !firstCourseLearning.firstLesson
+              ? "Start quiz"
+              : "Continue learning"}
           </Link>
         </Button>
       </div>
@@ -146,11 +164,17 @@ export function StudentDashboardView() {
                   </div>
                   <div className="mt-1 text-sm text-white/70">
                     {firstCourse
-                      ? "Next: Continue learning"
+                      ? `Next: ${firstCourseLearning?.firstLesson?.title ?? firstCourseLearning?.firstQuiz?.title ?? "Continue learning"}`
                       : coursesLoading
                         ? "Loading…"
                         : "Enroll in a course to get started."}
                   </div>
+                  {firstCourseLearning?.quizCount ? (
+                    <div className="mt-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
+                      {firstCourseLearning.quizCount} linked{" "}
+                      {firstCourseLearning.quizCount === 1 ? "quiz" : "quizzes"}
+                    </div>
+                  ) : null}
                   {firstCourse && (
                     <div className="mt-4 flex items-center gap-3">
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
@@ -166,11 +190,11 @@ export function StudentDashboardView() {
                     className="h-10 rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
                   >
                     <Link
-                      href={firstCourse ? `/dashboard/courses/lesson?course=${firstCourse.id}` : "/dashboard/courses"}
+                      href={firstCourse ? continueHref : "/dashboard/courses"}
                       className="inline-flex items-center gap-2"
                     >
                       <Play className="h-4 w-4" />
-                      {firstCourse ? "Resume" : "View courses"}
+                      {firstCourse ? continueLabel : "View courses"}
                     </Link>
                   </Button>
                   <Button
@@ -203,13 +227,18 @@ export function StudentDashboardView() {
                   coursesPreview.map((c) => (
                     <Link
                       key={c.id}
-                      href="/dashboard/courses"
+                      href={c.href}
                       className="block rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-zinc-900">{c.title}</div>
-                          <div className="truncate text-xs text-zinc-500">Next: {c.nextLesson}</div>
+                          <div className="truncate text-xs text-zinc-500">Next: {c.nextItem}</div>
+                          {c.quizCount > 0 ? (
+                            <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-gold">
+                              {c.quizCount} linked {c.quizCount === 1 ? "quiz" : "quizzes"}
+                            </div>
+                          ) : null}
                         </div>
                         <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
                           {c.progress}%
@@ -294,8 +323,8 @@ export function StudentDashboardView() {
                 asChild
                 className="w-full justify-between rounded-xl bg-gold text-gold-foreground hover:bg-gold/90"
               >
-                <Link href="/dashboard/quizzes">
-                  Practice quizzes
+                <Link href={firstCourseLearning?.firstQuiz?.href ?? "/dashboard/quizzes"}>
+                  {firstCourseLearning?.firstQuiz ? "Course quiz" : "Practice quizzes"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

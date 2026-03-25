@@ -4,5 +4,7 @@ export * from './user.dto';
 export * from './course.dto';
 export * from './order.dto';
 export * from './promo.dto';
+export * from './quiz.dto';
 export * from './leads.dto';
+export * from './webinar.dto';
 export * from './checkout.dto';

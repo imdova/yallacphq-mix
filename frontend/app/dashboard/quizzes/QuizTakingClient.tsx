@@ -34,10 +34,12 @@ export const QUIZ_BANK: Record<
   {
     title: string;
     question: QuizQuestion;
+    passingScorePercent?: number;
   }
 > = {
   m1: {
     title: "QM Principles",
+    passingScorePercent: 60,
     question: {
       id: "q1",
       prompt: (
@@ -56,6 +58,7 @@ export const QUIZ_BANK: Record<
   },
   m2: {
     title: "Quality Tools",
+    passingScorePercent: 60,
     question: {
       id: "q2",
       prompt: (
@@ -72,6 +75,7 @@ export const QUIZ_BANK: Record<
   },
   m3: {
     title: "Info Mgmt",
+    passingScorePercent: 60,
     question: {
       id: "q3",
       prompt: <>Which statement best describes data integrity?</>,
@@ -289,7 +293,7 @@ function shuffle<T>(arr: T[]) {
   return copy;
 }
 
-const PASSING_SCORE_PERCENT = 70;
+const DEFAULT_PASSING_SCORE_PERCENT = 60;
 const QUIZ_DURATION_SECONDS = 15 * 60;
 
 const DOMAINS = ["Quality Leadership", "Information Management", "Patient Safety"] as const;
@@ -532,7 +536,7 @@ function QuizPerformanceReport({
                       <p className="text-sm font-semibold text-zinc-900">{d.domain}</p>
                       <p className="text-sm font-semibold text-zinc-700">{d.percent}%</p>
                     </div>
-                    {d.percent < PASSING_SCORE_PERCENT ? (
+                    {d.percent < attempt.passingScorePercent ? (
                       <p className="mt-1 text-[11px] font-semibold tracking-wider text-rose-500">
                         + FOCUS REQUIRED
                       </p>
@@ -603,7 +607,7 @@ function StudyModeQuizPlayer({
   mode,
 }: {
   moduleId: string;
-  moduleQuiz: { title: string; question: QuizQuestion };
+  moduleQuiz: { title: string; question: QuizQuestion; passingScorePercent?: number };
   order: QuizQuestionOrder;
   mode: QuizPracticeMode;
 }) {
@@ -613,6 +617,7 @@ function StudyModeQuizPlayer({
   }, [moduleId, moduleQuiz.question, order]);
 
   const total = questions.length;
+  const passingScorePercent = moduleQuiz.passingScorePercent ?? DEFAULT_PASSING_SCORE_PERCENT;
 
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
@@ -685,7 +690,7 @@ function StudyModeQuizPlayer({
     const correctCount = questionsForReport.filter((q) => q.isCorrect).length;
     const totalQuestions = questionsForReport.length;
     const accuracyPercent = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-    const passed = accuracyPercent >= PASSING_SCORE_PERCENT;
+    const passed = accuracyPercent >= passingScorePercent;
 
     const report: QuizAttemptReport = {
       moduleId,
@@ -695,7 +700,7 @@ function StudyModeQuizPlayer({
       correctCount,
       incorrectCount: Math.max(0, totalQuestions - correctCount),
       accuracyPercent,
-      passingScorePercent: PASSING_SCORE_PERCENT,
+      passingScorePercent,
       passed,
       questions: questionsForReport,
     };

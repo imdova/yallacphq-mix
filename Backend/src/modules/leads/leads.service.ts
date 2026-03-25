@@ -14,8 +14,15 @@ export class LeadsService {
     email: string;
     phone: string;
     specialty?: string;
+    source?: 'general' | 'cphq' | 'webinar';
+    webinarId?: string;
+    webinarSlug?: string;
+    webinarTitle?: string;
   }) {
-    return this.leadModel.create(params);
+    return this.leadModel.create({
+      ...params,
+      source: params.source ?? 'general',
+    });
   }
 
   list() {

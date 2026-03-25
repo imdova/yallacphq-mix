@@ -2,7 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Star, Clock, Users, ShoppingCart, BookOpen, Check } from "lucide-react";
+import { Star, Clock, Users, ShoppingCart, BookOpen, Check, FileQuestion } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TAG_STYLES } from "@/constants/courses";
@@ -13,6 +13,7 @@ import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/contexts/auth-context";
 import { enrollCourse } from "@/lib/dal/courses";
 import { getErrorMessage } from "@/lib/api/error";
+import { getCourseCurriculumCounts } from "@/lib/course-learning";
 
 function formatPrice(value: number): string {
   if (value === 0) return "Free";
@@ -30,7 +31,12 @@ export function CourseCard({ course }: { course: Course }) {
   const displayPrice = hasSale ? course.priceSale! : (course.priceRegular ?? 0);
   const isFree = displayPrice === 0;
   const enrollmentOpen = course.enableEnrollment !== false;
-  const lessonsCount = course.lessons ?? Math.max(1, Math.round(course.durationHours * 4));
+  const curriculumCounts = getCourseCurriculumCounts(course);
+  const lessonsCount =
+    curriculumCounts.hasCurriculumItems || course.lessons != null
+      ? curriculumCounts.lessonCount
+      : Math.max(1, Math.round(course.durationHours * 4));
+  const quizzesCount = curriculumCounts.quizCount;
   const [enrolling, setEnrolling] = React.useState(false);
   const [enrollError, setEnrollError] = React.useState<string | null>(null);
 
@@ -133,6 +139,12 @@ export function CourseCard({ course }: { course: Course }) {
               <BookOpen className="h-4 w-4" aria-hidden />
               {lessonsCount.toLocaleString()} lessons
             </span>
+            {quizzesCount > 0 ? (
+              <span className="flex items-center gap-1.5">
+                <FileQuestion className="h-4 w-4" aria-hidden />
+                {quizzesCount.toLocaleString()} {quizzesCount === 1 ? "quiz" : "quizzes"}
+              </span>
+            ) : null}
           </div>
           {(course.priceRegular != null || course.priceSale != null) && (
             <div className="flex items-center gap-2">

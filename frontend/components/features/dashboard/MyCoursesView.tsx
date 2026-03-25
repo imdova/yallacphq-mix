@@ -7,10 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { OFFERS_DROPDOWN_ITEMS } from "@/constants";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getCourseLearningSummary } from "@/lib/course-learning";
 import {
   ArrowRight,
   BadgePercent,
+  BookOpen,
   CheckCircle2,
+  HelpCircle,
   Sparkles,
 } from "lucide-react";
 import { getMyCourses } from "@/lib/dal/courses";
@@ -22,10 +25,15 @@ type CourseCard = {
   id: string;
   title: string;
   instructor: string;
-  nextLesson: string;
+  nextItem: string;
   progress: number;
   image: string;
   access: "free" | "paid";
+  lessonCount: number;
+  quizCount: number;
+  primaryHref: string;
+  primaryLabel: string;
+  quizHref?: string;
 };
 
 export function MyCoursesView() {
@@ -52,15 +60,34 @@ export function MyCoursesView() {
   }, []);
 
   const currentCourses = React.useMemo((): CourseCard[] => {
-    return courses.map((c) => ({
-      id: c.id,
-      title: c.title,
-      instructor: c.instructorName ?? "Instructor",
-      nextLesson: "Continue learning",
-      progress: 0,
-      image: c.imageUrl ?? DEFAULT_IMAGE,
-      access: (c.priceSale ?? c.priceRegular ?? 0) > 0 ? "paid" : "free",
-    }));
+    return courses.map((course) => {
+      const learning = getCourseLearningSummary(course);
+      const primaryHref =
+        learning.defaultLaunch?.href ?? `/dashboard/courses/lesson?course=${course.id}`;
+      const primaryLabel = learning.firstLesson
+        ? "Start"
+        : learning.firstQuiz
+          ? "Start Quiz"
+          : "Open";
+
+      return {
+        id: course.id,
+        title: course.title,
+        instructor: course.instructorName ?? "Instructor",
+        nextItem: learning.firstLesson?.title ?? learning.firstQuiz?.title ?? "Continue learning",
+        progress: 0,
+        image: course.imageUrl ?? DEFAULT_IMAGE,
+        access: (course.priceSale ?? course.priceRegular ?? 0) > 0 ? "paid" : "free",
+        lessonCount: learning.lessonCount,
+        quizCount: learning.quizCount,
+        primaryHref,
+        primaryLabel,
+        quizHref:
+          learning.firstQuiz && learning.firstQuiz.href !== primaryHref
+            ? learning.firstQuiz.href
+            : undefined,
+      };
+    });
   }, [courses]);
 
   const completedCourses = React.useMemo((): { id: string; title: string; image: string; access: "free" | "paid" }[] => {
@@ -279,10 +306,22 @@ function CoursesSection({
                   {course.title}
                 </h3>
                 <p className="mt-1 text-sm text-zinc-500">Instructor: {course.instructor}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    {course.lessonCount} {course.lessonCount === 1 ? "lesson" : "lessons"}
+                  </span>
+                  {course.quizCount > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2.5 py-1 text-xs font-semibold text-zinc-800">
+                      <HelpCircle className="h-3.5 w-3.5 text-gold" />
+                      {course.quizCount} {course.quizCount === 1 ? "quiz" : "quizzes"}
+                    </span>
+                  ) : null}
+                </div>
                 {course.progress > 0 ? (
-                  <p className="mt-1 text-sm text-zinc-600">Next: {course.nextLesson}</p>
+                  <p className="mt-1 text-sm text-zinc-600">Next: {course.nextItem}</p>
                 ) : (
-                  <p className="mt-1 text-sm text-zinc-600">Start with: {course.nextLesson}</p>
+                  <p className="mt-1 text-sm text-zinc-600">Start with: {course.nextItem}</p>
                 )}
                 <div className="mt-3 flex items-center gap-2">
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
@@ -296,19 +335,30 @@ function CoursesSection({
                     size="sm"
                     className="flex-1 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                   >
-                    <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
-                      {course.progress === 0 ? "Start" : "Continue"}
+                    <Link href={course.primaryHref}>
+                      {course.progress === 0 ? course.primaryLabel : "Continue"}
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-                  >
-                    <Link href="/courses">Browse</Link>
-                  </Button>
+                  {course.quizHref ? (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                    >
+                      <Link href={course.quizHref}>Quiz</Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                    >
+                      <Link href="/courses">Browse</Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -341,10 +391,15 @@ function CoursesSection({
                         <span className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-zinc-700">
                           {course.progress === 0 ? "New" : `${course.progress}%`}
                         </span>
+                        {course.quizCount > 0 ? (
+                          <span className="rounded-lg bg-gold/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-zinc-800">
+                            {course.quizCount} {course.quizCount === 1 ? "Quiz" : "Quizzes"}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-0.5 text-sm text-zinc-500">Instructor: {course.instructor}</p>
                       <p className="mt-0.5 text-sm text-zinc-600">
-                        {course.progress === 0 ? "Start with" : "Next"}: {course.nextLesson}
+                        {course.progress === 0 ? "Start with" : "Next"}: {course.nextItem}
                       </p>
                     </div>
                   </div>
@@ -361,11 +416,21 @@ function CoursesSection({
                       size="sm"
                       className="gap-2 rounded-xl bg-gold font-medium text-gold-foreground hover:bg-gold/90"
                     >
-                      <Link href={`/dashboard/courses/lesson?course=${course.id}`}>
-                        {course.progress === 0 ? "Start" : "Continue"}
+                      <Link href={course.primaryHref}>
+                        {course.progress === 0 ? course.primaryLabel : "Continue"}
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
+                    {course.quizHref ? (
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                      >
+                        <Link href={course.quizHref}>Quiz</Link>
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </CardContent>

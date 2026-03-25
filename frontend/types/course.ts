@@ -25,6 +25,7 @@ export interface CourseCurriculumQuiz {
   id: string;
   type: "quiz";
   title: string;
+  quizId?: string;
 }
 
 export type CourseCurriculumItem = CourseCurriculumLecture | CourseCurriculumQuiz;

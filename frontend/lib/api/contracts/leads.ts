@@ -19,6 +19,14 @@ export const legacyLeadCreateBodySchema = leadCreateBodySchema.extend({
 
 export type LegacyLeadCreateBody = z.infer<typeof legacyLeadCreateBodySchema>;
 
+export const webinarLeadCreateBodySchema = leadCreateBodySchema.extend({
+  webinarId: z.string().min(1).optional(),
+  webinarSlug: z.string().min(1).optional(),
+  webinarTitle: z.string().min(1).optional(),
+});
+
+export type WebinarLeadCreateBody = z.infer<typeof webinarLeadCreateBodySchema>;
+
 export const leadSubmitResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
@@ -33,7 +41,9 @@ export type RegisterCphqBody = z.infer<typeof registerCphqBodySchema>;
 export const registerCphqResponseSchema = leadSubmitResponseSchema;
 export type RegisterCphqResponse = z.infer<typeof registerCphqResponseSchema>;
 
-export const webinarRegisterBodySchema = legacyLeadCreateBodySchema;
+export const webinarRegisterBodySchema = webinarLeadCreateBodySchema.extend({
+  specialty: z.string().min(1),
+});
 export type WebinarRegisterBody = z.infer<typeof webinarRegisterBodySchema>;
 export const webinarRegisterResponseSchema = leadSubmitResponseSchema;
 export type WebinarRegisterResponse = z.infer<typeof webinarRegisterResponseSchema>;

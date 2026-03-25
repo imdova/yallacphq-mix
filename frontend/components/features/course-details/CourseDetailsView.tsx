@@ -42,6 +42,7 @@ import type { Course, CourseCurriculumItem, CourseReviewMediaItem } from "@/type
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { getErrorMessage } from "@/lib/api/error";
+import { getCourseCurriculumCounts } from "@/lib/course-learning";
 import { youtubeEmbedUrl, youtubeThumbUrl } from "./reviewMedia";
 
 const FOOTER_PROGRAMS = [
@@ -420,15 +421,9 @@ export function CourseDetailsView() {
   const videoId = getYouTubeId(displayCourse.videoPreviewUrl);
   const curriculumSections = displayCourse.curriculumSections ?? [];
   const totalModules = curriculumSections.length;
-  const lessonsFromCurriculum = curriculumSections.reduce(
-    (acc, section) => acc + (section.items?.filter((item) => item.type === "lecture").length ?? 0),
-    0
-  );
-  const totalLessons = displayCourse.lessons ?? lessonsFromCurriculum;
-  const totalQuizzes = curriculumSections.reduce(
-    (acc, section) => acc + (section.items?.filter((item) => item.type === "quiz").length ?? 0),
-    0
-  );
+  const curriculumCounts = getCourseCurriculumCounts(displayCourse);
+  const totalLessons = curriculumCounts.lessonCount;
+  const totalQuizzes = curriculumCounts.quizCount;
   const levelLabel = displayCourse.level ?? "Intermediate";
   const certLabel = displayCourse.certificationType ?? "Certificate Included";
   const learningOutcomes = displayCourse.learningOutcomes?.filter(Boolean) ?? [];
@@ -1036,8 +1031,9 @@ export function CourseDetailsView() {
                               </h2>
                             </div>
                             <p className="mt-1 text-sm text-zinc-600">
-                              {totalModules} Modules • {totalLessons} Lessons • {safeHours}h total
-                              length
+                              {totalModules} Modules • {totalLessons}{" "}
+                              {totalLessons === 1 ? "Lesson" : "Lessons"} • {totalQuizzes}{" "}
+                              {totalQuizzes === 1 ? "Quiz" : "Quizzes"} • {safeHours}h total length
                             </p>
                           </div>
 
@@ -1513,7 +1509,13 @@ export function CourseDetailsView() {
                       <span className="text-zinc-300">•</span>
                       <span>{displayCourse.reviewCount ?? "—"} reviews</span>
                       <span className="text-zinc-300">•</span>
-                      <span>{totalLessons} lessons</span>
+                      <span>
+                        {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
+                      </span>
+                      <span className="text-zinc-300">•</span>
+                      <span>
+                        {totalQuizzes} {totalQuizzes === 1 ? "quiz" : "quizzes"}
+                      </span>
                     </div>
                   </div>
 

@@ -16,6 +16,18 @@ export class Lead {
 
   @Prop()
   specialty?: string;
+
+  @Prop({ default: 'general', enum: ['general', 'cphq', 'webinar'] })
+  source!: 'general' | 'cphq' | 'webinar';
+
+  @Prop()
+  webinarId?: string;
+
+  @Prop()
+  webinarSlug?: string;
+
+  @Prop()
+  webinarTitle?: string;
 }
 
 export const LeadSchema = SchemaFactory.createForClass(Lead);

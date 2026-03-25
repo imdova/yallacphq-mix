@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Bell,
   ChevronDown,
+  FileQuestion,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -39,6 +40,8 @@ const titleMap: Record<string, { title: string; subtitle?: string }> = {
   "/admin/students": { title: "Students", subtitle: "Manage students and roles" },
   "/admin/courses": { title: "Courses", subtitle: "Catalog, pricing, and publishing" },
   "/admin/courses/new": { title: "", subtitle: "" },
+  "/admin/quizzes": { title: "Quizzes", subtitle: "Create, edit, and monitor assessments" },
+  "/admin/quizzes/new": { title: "Add New Quiz", subtitle: "Build questions and publish when ready" },
   "/admin/orders": { title: "Orders", subtitle: "Payments and checkout activity" },
   "/admin/promo-codes": { title: "Promo codes", subtitle: "Discount codes and limits" },
   "/admin/offers": { title: "Offers", subtitle: "Landing pages and promotions" },
@@ -279,6 +282,12 @@ export function AdminHeader({ onOpenNav }: { onOpenNav?: () => void }) {
                 <Link href="/admin/courses/new">
                   <GraduationCap className="mr-2 h-4 w-4" />
                   New course
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/quizzes/new">
+                  <FileQuestion className="mr-2 h-4 w-4" />
+                  Add New Quiz
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

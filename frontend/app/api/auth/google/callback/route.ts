@@ -6,6 +6,46 @@ export const dynamic = "force-dynamic";
 
 const ACCESS_TOKEN_COOKIE = "access_token";
 
+function isLocalHost(host: string): boolean {
+  return /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(host.trim());
+}
+
+function getAppOrigin(req: Request): string {
+  const explicit =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    "";
+  const url = new URL(req.url);
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.trim() || url.protocol.replace(":", "");
+  const forwardedHost =
+    req.headers.get("x-forwarded-host")?.trim() ||
+    req.headers.get("host")?.trim() ||
+    url.host;
+
+  if (explicit) {
+    try {
+      const explicitUrl = new URL(explicit);
+      if (!isLocalHost(explicitUrl.host)) return explicitUrl.origin;
+    } catch {
+      // Ignore invalid explicit origin and continue with request-derived origin.
+    }
+  }
+
+  if (forwardedHost && !isLocalHost(forwardedHost)) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  if (explicit) {
+    try {
+      return new URL(explicit).origin;
+    } catch {
+      // Ignore invalid explicit origin and continue with request-derived origin.
+    }
+  }
+
+  return url.origin;
+}
+
 function setAccessTokenCookie(res: NextResponse, token: string) {
   res.cookies.set(ACCESS_TOKEN_COOKIE, token, {
     httpOnly: true,
@@ -25,7 +65,7 @@ function forwardSetCookie(from: Response, to: NextResponse) {
 }
 
 function redirectToLogin(req: Request, message: string) {
-  const url = new URL("/auth/login", req.url);
+  const url = new URL("/auth/login", getAppOrigin(req));
   url.searchParams.set("oauth_error", message);
   return NextResponse.redirect(url);
 }
@@ -69,7 +109,7 @@ export async function GET(req: Request) {
       return redirectToLogin(req, "Invalid Google login response");
     }
 
-    const nextRes = NextResponse.redirect(new URL(parsed.data.next, req.url));
+    const nextRes = NextResponse.redirect(new URL(parsed.data.next, getAppOrigin(req)));
     const forwarded = forwardSetCookie(res, nextRes);
     if (!forwarded) {
       setAccessTokenCookie(nextRes, parsed.data.accessToken);

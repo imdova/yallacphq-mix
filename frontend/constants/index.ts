@@ -28,7 +28,7 @@ export const ROUTES = {
   CPHQ_FREE_LECTURE: "/offers/cphq-free-lecture",
   CPHQ_OFFER: "/offers/cphq-offer",
   WEBINARS: "/webinars",
-  CPHQ_WEBINAR_1: "/webinars/cphq-webinar-1",
+  CPHQ_WEBINAR_1: "/webinars",
   COURSE_DETAILS: "/course-details",
   CART: "/cart",
   CHECKOUT: "/checkout",
@@ -44,7 +44,7 @@ export const OFFERS_DROPDOWN_ITEMS = [
 ] as const;
 
 export const WEBINARS_DROPDOWN_ITEMS = [
-  { href: "/webinars/cphq-webinar-1", label: "CPHQ Webinar 1" },
+  { href: "/webinars", label: "All webinars" },
 ] as const;
 
 export const PAGINATION = {

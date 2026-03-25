@@ -6,12 +6,14 @@ import Link from "next/link";
 import { LessonPageHeader } from "@/components/features/dashboard/LessonPageHeader";
 import { LessonSidebar } from "@/components/features/dashboard/LessonSidebar";
 import { LessonContentView } from "@/components/features/dashboard/LessonContentView";
-import { QuizTakingClient, QUIZ_BANK } from "@/app/dashboard/quizzes/QuizTakingClient";
+import { CourseQuizPlayer } from "@/components/features/dashboard/CourseQuizPlayer";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { getMyCourses } from "@/lib/dal/courses";
+import { getCourseQuizById } from "@/lib/dal/quizzes";
 import { getErrorMessage } from "@/lib/api/error";
 import type { Course, CourseCurriculumLecture } from "@/types/course";
+import type { AdminStoredQuiz } from "@/types/quiz";
 import { ArrowLeft, Clock, ListOrdered, Menu, Shuffle, SlidersHorizontal, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +33,15 @@ function buildLessonHref(courseId: string, lessonId: string): string {
   return `/dashboard/courses/lesson?${params.toString()}`;
 }
 
-function LessonQuizConfiguration({ moduleId }: { moduleId: string }) {
+function buildQuizHref(courseId: string, quizId: string): string {
+  const params = new URLSearchParams();
+  params.set("course", courseId);
+  params.set("quiz", quizId);
+  return `/dashboard/courses/lesson?${params.toString()}`;
+}
+
+function LessonQuizConfiguration({ quiz }: { quiz: AdminStoredQuiz }) {
   const searchParams = useSearchParams();
-  const quiz = QUIZ_BANK[moduleId] ?? QUIZ_BANK.m2;
 
   const [order, setOrder] = React.useState<QuizQuestionOrder>("random");
   const [mode, setMode] = React.useState<QuizPracticeMode>("test");
@@ -41,10 +49,10 @@ function LessonQuizConfiguration({ moduleId }: { moduleId: string }) {
   React.useEffect(() => {
     setOrder("random");
     setMode("test");
-  }, [moduleId]);
+  }, [quiz.id]);
 
   const startParams = new URLSearchParams(searchParams.toString());
-  startParams.set("quiz", moduleId);
+  startParams.set("quiz", quiz.id);
   startParams.set("quizStart", "1");
   startParams.set("order", order);
   startParams.set("mode", mode);
@@ -60,9 +68,9 @@ function LessonQuizConfiguration({ moduleId }: { moduleId: string }) {
     : "/dashboard/courses/lesson";
 
   // Placeholder values to match the provided design.
-  const totalQuestions = 67;
-  const durationMin = 60;
-  const passingScore = 70;
+  const totalQuestions = quiz.questionBank?.length ?? quiz.questions ?? 0;
+  const durationMin = quiz.meta?.durationMinutes ?? 0;
+  const passingScore = quiz.meta?.passingScorePercent ?? 60;
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -297,6 +305,9 @@ export default function LessonPage() {
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [activeQuiz, setActiveQuiz] = React.useState<AdminStoredQuiz | null>(null);
+  const [quizLoading, setQuizLoading] = React.useState(false);
+  const [quizLoadError, setQuizLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -325,7 +336,7 @@ export default function LessonPage() {
 
   const courseId = searchParams.get("course")?.trim() ?? "";
   const lessonId = searchParams.get("lesson")?.trim() ?? "";
-  const quizModuleId = searchParams.get("quiz");
+  const quizId = searchParams.get("quiz")?.trim() ?? "";
   const quizStarted = searchParams.get("quizStart") === "1";
   const quizMode = searchParams.get("mode");
   const isStudyMode = quizMode === "study";
@@ -392,6 +403,8 @@ export default function LessonPage() {
               {
                 id: item.id,
                 title: item.title,
+                href: item.quizId ? buildQuizHref(activeCourse.id, item.quizId) : undefined,
+                current: Boolean(item.quizId && quizId === item.quizId),
               },
             ]
           : []
@@ -401,12 +414,45 @@ export default function LessonPage() {
         id: section.id,
         title: section.title,
         description: section.description,
-        current: lessons.some((lesson) => lesson.current),
+        current: lessons.some((lesson) => lesson.current) || quizzes.some((quiz) => quiz.current),
         lessons,
         quizzes,
       };
     });
-  }, [activeCourse, currentLecture?.id]);
+  }, [activeCourse, currentLecture?.id, quizId]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!quizId) {
+      setActiveQuiz(null);
+      setQuizLoadError(null);
+      setQuizLoading(false);
+      return;
+    }
+
+    setQuizLoading(true);
+    setQuizLoadError(null);
+    getCourseQuizById(quizId)
+      .then((quiz) => {
+        if (!cancelled) {
+          setActiveQuiz(quiz);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setActiveQuiz(null);
+          setQuizLoadError(getErrorMessage(error, "Failed to load this quiz"));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuizLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizId]);
 
   const content = loading ? (
     <div className="flex min-h-[50vh] items-center justify-center">
@@ -441,11 +487,38 @@ export default function LessonPage() {
         </Button>
       </div>
     </div>
-  ) : quizModuleId ? (
+  ) : quizId ? quizLoading ? (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+        <p className="text-sm text-zinc-500">Loading quiz…</p>
+      </div>
+    </div>
+  ) : quizLoadError ? (
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4">
+      <p className="text-sm font-semibold text-rose-800">Couldn’t load this quiz</p>
+      <p className="mt-1 text-sm text-rose-700">{quizLoadError}</p>
+    </div>
+  ) : !activeQuiz ? (
+    <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-6 shadow-sm">
+      <p className="text-base font-semibold text-zinc-900">This quiz is not available</p>
+      <p className="mt-1 text-sm text-zinc-600">
+        Link a saved quiz from the course builder, then open it again from the course outline.
+      </p>
+    </div>
+  ) : (
     quizStarted ? (
-      <QuizTakingClient moduleId={quizModuleId} />
+      <CourseQuizPlayer
+        quiz={activeQuiz}
+        order={searchParams.get("order") === "regular" ? "regular" : "random"}
+        mode={
+          searchParams.get("mode") === "quiz" || searchParams.get("mode") === "study"
+            ? (searchParams.get("mode") as "quiz" | "study")
+            : "test"
+        }
+      />
     ) : (
-      <LessonQuizConfiguration moduleId={quizModuleId} />
+      <LessonQuizConfiguration quiz={activeQuiz} />
     )
   ) : (
     <LessonContentView

@@ -36,6 +36,9 @@ export class CurriculumItem {
   title!: string;
 
   @Prop()
+  quizId?: string;
+
+  @Prop()
   videoUrl?: string;
 
   @Prop()

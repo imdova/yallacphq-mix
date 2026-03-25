@@ -17,6 +17,8 @@ type LessonSidebarLesson = {
 type LessonSidebarQuiz = {
   id: string;
   title: string;
+  href?: string;
+  current: boolean;
 };
 
 type LessonSidebarSection = {
@@ -103,7 +105,9 @@ export function LessonSidebar({
           sections.map((section) => {
             const lectureCount = section.lessons.length;
             const quizCount = section.quizzes.length;
-            const isQuizActive = Boolean(quizParam && section.current);
+            const isQuizActive = Boolean(
+              quizParam && section.quizzes.some((quiz) => quiz.current)
+            );
 
             return (
               <div key={section.id} className="py-1">
@@ -150,21 +154,42 @@ export function LessonSidebar({
                       </Link>
                     ))}
 
-                    {section.quizzes.map((quiz) => (
-                      <div
-                        key={quiz.id}
-                        className={cn(
-                          "mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-500",
-                          isQuizActive ? "bg-gold/10 text-zinc-800" : "bg-zinc-50/80"
-                        )}
-                      >
-                        <HelpCircle className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                        <span className="truncate">{quiz.title}</span>
-                        <span className="ml-auto shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 ring-1 ring-zinc-200">
-                          Quiz
-                        </span>
-                      </div>
-                    ))}
+                    {section.quizzes.map((quiz) =>
+                      quiz.href ? (
+                        <Link
+                          key={quiz.id}
+                          href={quiz.href}
+                          onClick={onNavigate}
+                          className={cn(
+                            "mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm",
+                            quiz.current
+                              ? "bg-gold/10 text-zinc-800"
+                              : "bg-zinc-50/80 text-zinc-500 hover:bg-zinc-100"
+                          )}
+                          aria-current={quiz.current ? "page" : undefined}
+                        >
+                          <HelpCircle className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                          <span className="truncate">{quiz.title}</span>
+                          <span className="ml-auto shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 ring-1 ring-zinc-200">
+                            Quiz
+                          </span>
+                        </Link>
+                      ) : (
+                        <div
+                          key={quiz.id}
+                          className={cn(
+                            "mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-zinc-500",
+                            isQuizActive ? "bg-gold/10 text-zinc-800" : "bg-zinc-50/80"
+                          )}
+                        >
+                          <HelpCircle className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                          <span className="truncate">{quiz.title}</span>
+                          <span className="ml-auto shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 ring-1 ring-zinc-200">
+                            Quiz
+                          </span>
+                        </div>
+                      )
+                    )}
                   </div>
                 ) : null}
               </div>

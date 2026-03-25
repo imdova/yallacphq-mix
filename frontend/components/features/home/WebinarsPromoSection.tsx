@@ -1,11 +1,36 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Calendar, Play, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getPublicWebinars } from "@/lib/dal/webinars";
+import type { StoredWebinar } from "@/types/webinar";
 
 export function WebinarsPromoSection() {
+  const [featured, setFeatured] = React.useState<StoredWebinar | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const webinars = await getPublicWebinars();
+        if (cancelled || webinars.length === 0) return;
+        const featuredItem = webinars.find((item) => item.isFeatured) ?? webinars[0] ?? null;
+        if (!cancelled) setFeatured(featuredItem);
+      } catch {
+        if (!cancelled) setFeatured(null);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section
       className="scroll-mt-20 bg-white py-16 md:py-24"
@@ -52,8 +77,11 @@ export function WebinarsPromoSection() {
                 variant="outline"
                 className="rounded-xl border-zinc-600 text-white hover:bg-zinc-800 hover:text-white"
               >
-                <Link href="/webinars/cphq-webinar-1" className="inline-flex items-center gap-2">
-                  CPHQ Webinar 1
+                <Link
+                  href={featured ? `/webinars/${featured.slug}` : "/webinars"}
+                  className="inline-flex items-center gap-2"
+                >
+                  {featured ? featured.title : "Browse webinars"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

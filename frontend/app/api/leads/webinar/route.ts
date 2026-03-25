@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 import { jsonError, jsonOk, zodIssues } from "@/lib/api/route-helpers";
-import { leadCreateBodySchema, leadSubmitResponseSchema } from "@/lib/api/contracts/leads";
+import { webinarLeadCreateBodySchema, leadSubmitResponseSchema } from "@/lib/api/contracts/leads";
+import { BACKEND_API_PREFIX, getBackendUrl, isBackendConfigured } from "@/lib/api/backend-url";
 import { getRequestIdFromRequest, newRequestId } from "@/lib/api/request-id";
 
 const WEBHOOK_URL =
@@ -14,7 +15,30 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const requestId = getRequestIdFromRequest(req) ?? newRequestId();
   try {
-    const body = leadCreateBodySchema.parse(await req.json());
+    const body = webinarLeadCreateBodySchema.parse(await req.json());
+
+    if (isBackendConfigured()) {
+      const backendUrl = getBackendUrl();
+      const res = await fetch(`${backendUrl}${BACKEND_API_PREFIX}/leads/webinar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-request-id": requestId,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 400) {
+          return jsonError(400, "Invalid request", { issues: data?.issues, requestId });
+        }
+        const message = typeof data?.message === "string" ? data.message : "Backend error";
+        return jsonError(res.status, message, { requestId });
+      }
+      return jsonOk(leadSubmitResponseSchema.parse(data), { requestId });
+    }
+
     if (!WEBHOOK_URL) {
       console.error("[leads/webinar]", { requestId, message: "Missing webhook env var" });
       return jsonOk(leadSubmitResponseSchema.parse({ success: true }), { requestId });

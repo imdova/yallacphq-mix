@@ -29,6 +29,7 @@ export const curriculumQuizSchema = z.object({
   id: z.string().min(1),
   type: z.literal('quiz'),
   title: z.string().min(1),
+  quizId: z.string().min(1).optional(),
 });
 export type CurriculumQuiz = z.infer<typeof curriculumQuizSchema>;
 

@@ -15,6 +15,7 @@ import {
 import { Lock, ArrowRight } from "lucide-react";
 import { registerWebinar } from "@/lib/dal/leads";
 import { getErrorMessage } from "@/lib/api/error";
+import type { StoredWebinar } from "@/types/webinar";
 
 const SPECIALTIES = [
   "Physician",
@@ -84,7 +85,21 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-export function Webinar1SpotForm() {
+type WebinarSpotFormProps = {
+  webinar?: Pick<
+    StoredWebinar,
+    | "id"
+    | "title"
+    | "slug"
+    | "speakerName"
+    | "speakerTitle"
+    | "startsAt"
+    | "registrationEnabled"
+    | "seatsLeft"
+  >;
+};
+
+export function Webinar1SpotForm({ webinar }: WebinarSpotFormProps) {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [countryCode, setCountryCode] = React.useState("+20");
@@ -92,10 +107,23 @@ export function Webinar1SpotForm() {
   const [specialty, setSpecialty] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = React.useState("");
-  const countdown = useCountdown(DEFAULT_TARGET);
+  const targetDate = React.useMemo(() => {
+    if (!webinar?.startsAt) return DEFAULT_TARGET;
+    const date = new Date(webinar.startsAt);
+    return Number.isNaN(date.getTime()) ? DEFAULT_TARGET : date;
+  }, [webinar?.startsAt]);
+  const countdown = useCountdown(targetDate);
+  const canRegister = webinar?.registrationEnabled ?? true;
+  const seatsLeftLabel =
+    webinar?.seatsLeft === null || webinar?.seatsLeft === undefined
+      ? "Limited spots available"
+      : `Only ${webinar.seatsLeft} spots left`;
+  const speakerName = webinar?.speakerName?.trim() || "Yalla CPHQ Team";
+  const speakerTitle = webinar?.speakerTitle?.trim() || "Webinar Host";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canRegister) return;
     setErrorMessage("");
     setStatus("loading");
     try {
@@ -107,6 +135,9 @@ export function Webinar1SpotForm() {
         email: email.trim(),
         phone: fullPhone,
         specialty,
+        webinarId: webinar?.id,
+        webinarSlug: webinar?.slug,
+        webinarTitle: webinar?.title,
       });
       if (!res.success) {
         setStatus("error");
@@ -131,7 +162,7 @@ export function Webinar1SpotForm() {
 
       <div className="mt-6 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-red-600">
-          HURRY! ONLY 25 SPOTS LEFT
+          HURRY! {seatsLeftLabel.toUpperCase()}
         </p>
         <div className="rounded-xl bg-gold/90 px-4 py-3 text-gold-foreground">
           <div className="flex items-baseline justify-center gap-1 font-mono text-2xl font-bold tabular-nums md:text-3xl">
@@ -255,10 +286,10 @@ export function Webinar1SpotForm() {
         )}
         <Button
           type="submit"
-          disabled={status === "loading"}
+          disabled={status === "loading" || !canRegister}
           className="h-12 w-full rounded-lg bg-gold text-gold-foreground hover:bg-gold/90 font-semibold gap-2"
         >
-          {status === "loading" ? "Sending…" : "Register Now"}
+          {status === "loading" ? "Sending…" : canRegister ? "Register Now" : "Registration Closed"}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
@@ -275,9 +306,16 @@ export function Webinar1SpotForm() {
         />
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">HOSTED BY</p>
-          <p className="text-sm font-medium text-zinc-900">Dr. Jane Smith, CPHQ</p>
+          <p className="text-sm font-medium text-zinc-900">
+            {speakerName}
+            {speakerTitle ? `, ${speakerTitle}` : ""}
+          </p>
         </div>
       </div>
     </div>
   );
+}
+
+export function WebinarSpotForm(props: WebinarSpotFormProps) {
+  return <Webinar1SpotForm {...props} />;
 }

@@ -32,6 +32,9 @@ export class CurriculumItemDto {
   @ApiProperty({ example: 'Introduction to CPHQ' })
   title!: string;
 
+  @ApiProperty({ required: false, example: '69c1257797fa8fc1f2cd43ff' })
+  quizId?: string;
+
   @ApiProperty({ required: false, example: 'https://www.youtube.com/watch?v=123' })
   videoUrl?: string;
 

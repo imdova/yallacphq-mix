@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getVdoCipherVideoId, getYouTubeVideoId } from "@/lib/video-source";
 
 function isHttpUrl(value: string) {
   try {
@@ -71,9 +72,13 @@ const baseCourseSchema = z.object({
         if (!v) return true;
         const trimmed = v.trim();
         if (!trimmed) return true;
-        return isHttpUrl(trimmed);
+        return (
+          isHttpUrl(trimmed) ||
+          getYouTubeVideoId(trimmed) != null ||
+          getVdoCipherVideoId(trimmed) != null
+        );
       },
-      { message: "Video preview must be a valid URL (http/https)." }
+      { message: "Video preview must be a valid URL, YouTube ID, or VdoCipher video ID." }
     ),
   seoTitle: z.string().max(60).optional(),
   seoDescription: z.string().max(160).optional(),

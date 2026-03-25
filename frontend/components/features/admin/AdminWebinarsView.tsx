@@ -546,12 +546,12 @@ export function AdminWebinarsView() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="webinar-video-url">Video URL</Label>
+                  <Label htmlFor="webinar-video-url">Video / VdoCipher ID</Label>
                   <Input
                     id="webinar-video-url"
                     value={form.videoUrl}
                     onChange={(event) => onFieldChange("videoUrl", event.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
+                    placeholder="Paste a VdoCipher video ID or video URL"
                   />
                 </div>
                 <div className="space-y-2">

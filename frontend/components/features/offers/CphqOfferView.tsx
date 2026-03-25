@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PRODUCT } from "@/components/features/checkout/checkoutData";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 
 const HIGHLIGHTS = [
   { icon: BadgeCheck, title: "Exam‑aligned curriculum", desc: "Focused on high‑frequency CPHQ domains and modern QI tools." },
@@ -368,13 +369,11 @@ export function CphqOfferView() {
                     <p className="mt-1 text-xs text-zinc-500">Short testimonials from students.</p>
                     <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
                       <div className="relative aspect-[16/9] w-full bg-black">
-                        <iframe
-                          className="absolute inset-0 h-full w-full"
-                          src="https://www.youtube.com/embed/9JJYT8ajOKg?rel=0&modestbranding=1&playsinline=1"
+                        <MediaVideoPlayer
+                          source="9JJYT8ajOKg"
                           title="Student testimonial"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                          allowFullScreen
-                          referrerPolicy="strict-origin-when-cross-origin"
+                          access="public"
+                          className="h-full w-full"
                         />
                       </div>
                     </div>

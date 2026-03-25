@@ -522,6 +522,7 @@ export default function LessonPage() {
     )
   ) : (
     <LessonContentView
+      courseId={activeCourse.id}
       courseTitle={activeCourse.title}
       courseDescription={activeCourse.description}
       sectionTitle={currentLecture?.sectionTitle}

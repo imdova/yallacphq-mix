@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CourseCurriculumLecture } from "@/types/course";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,28 +21,8 @@ type LessonLink = {
   href: string;
 };
 
-function getYouTubeId(input?: string): string | null {
-  if (!input) return null;
-  const raw = input.trim();
-  if (!raw) return null;
-  if (/^[a-zA-Z0-9_-]{8,20}$/.test(raw)) return raw;
-  try {
-    const url = new URL(raw);
-    const v = url.searchParams.get("v");
-    if (v) return v;
-    if (url.hostname.includes("youtu.be")) {
-      return url.pathname.split("/").filter(Boolean)[0] ?? null;
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    const embedIdx = parts.findIndex((part) => part === "embed");
-    if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
-  } catch {
-    // ignore invalid urls
-  }
-  return null;
-}
-
 export function LessonContentView({
+  courseId,
   courseTitle,
   courseDescription,
   sectionTitle,
@@ -52,6 +33,7 @@ export function LessonContentView({
   previousLesson,
   nextLesson,
 }: {
+  courseId?: string;
   courseTitle?: string;
   courseDescription?: string;
   sectionTitle?: string;
@@ -64,7 +46,6 @@ export function LessonContentView({
 }) {
   const [aiQuery, setAiQuery] = React.useState("");
   const videoUrl = lesson?.videoUrl?.trim() ?? "";
-  const videoId = getYouTubeId(videoUrl);
   const overviewText =
     sectionDescription?.trim() || courseDescription?.trim() || "Lesson details will appear here once the admin adds them.";
   const resourceName = lesson?.materialFileName?.trim() || (lesson ? `${lesson.title} materials` : "Lesson materials");
@@ -135,32 +116,25 @@ export function LessonContentView({
 
       <Card className="overflow-hidden rounded-2xl border-zinc-200 bg-white shadow-sm">
         <div className="relative aspect-[64/27] w-full bg-black">
-          {videoId ? (
-            <iframe
-              className="absolute inset-0 h-full w-full"
-              src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`}
-              title={lesson.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : videoUrl ? (
-            <video className="absolute inset-0 h-full w-full" src={videoUrl} controls playsInline>
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-white/80">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                <PlayCircle className="h-7 w-7" />
+          <MediaVideoPlayer
+            source={videoUrl}
+            title={lesson.title}
+            access="course_lesson"
+            courseId={courseId}
+            fallback={
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-white/80">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
+                  <PlayCircle className="h-7 w-7" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold">No video added yet</p>
+                  <p className="mt-1 text-sm text-white/60">
+                    This lesson exists in the course curriculum, but its video field is still empty.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-base font-semibold">No video added yet</p>
-                <p className="mt-1 text-sm text-white/60">
-                  This lesson exists in the course curriculum, but its video URL is still empty.
-                </p>
-              </div>
-            </div>
-          )}
+            }
+          />
         </div>
         <div className="flex flex-col gap-2 border-t border-zinc-200 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-zinc-600">

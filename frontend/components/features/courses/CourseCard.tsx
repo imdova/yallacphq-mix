@@ -129,8 +129,8 @@ export function CourseCard({ course }: { course: Course }) {
             <p className="truncate text-xs text-zinc-500">{course.instructorTitle}</p>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 text-sm">
-          <div className="flex items-center gap-3 text-zinc-500">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-3 text-zinc-500">
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" aria-hidden />
               {course.durationHours}h
@@ -139,12 +139,10 @@ export function CourseCard({ course }: { course: Course }) {
               <BookOpen className="h-4 w-4" aria-hidden />
               {lessonsCount.toLocaleString()} lessons
             </span>
-            {quizzesCount > 0 ? (
-              <span className="flex items-center gap-1.5">
-                <FileQuestion className="h-4 w-4" aria-hidden />
-                {quizzesCount.toLocaleString()} {quizzesCount === 1 ? "quiz" : "quizzes"}
-              </span>
-            ) : null}
+            <span className="flex items-center gap-1.5">
+              <FileQuestion className="h-4 w-4" aria-hidden />
+              {quizzesCount.toLocaleString()} {quizzesCount === 1 ? "quiz" : "quizzes"}
+            </span>
           </div>
           {(course.priceRegular != null || course.priceSale != null) && (
             <div className="flex items-center gap-2">

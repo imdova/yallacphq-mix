@@ -1693,17 +1693,17 @@ export default function AdminCourseNewPage() {
                                                     </div>
                                                     <div className="space-y-1.5">
                                                       <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                                        Video URL
+                                                        Lesson video
                                                       </label>
                                                       <input
-                                                        type="url"
+                                                        type="text"
                                                         value={lecture.videoUrl}
                                                         onChange={(e) =>
                                                           updateLecture(section.id, lecture.id, {
                                                             videoUrl: e.target.value,
                                                           })
                                                         }
-                                                        placeholder="https://www.youtube.com/watch?v=…"
+                                                        placeholder="Paste a VdoCipher video ID or video URL"
                                                         className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                                                       />
                                                     </div>
@@ -2098,17 +2098,17 @@ export default function AdminCourseNewPage() {
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   <div className="space-y-1.5">
                                                     <label className="text-sm font-medium text-zinc-700">
-                                                      Video URL
+                                                      Lesson video
                                                     </label>
                                                     <input
-                                                      type="url"
+                                                      type="text"
                                                       value={item.videoUrl}
                                                       onChange={(e) =>
                                                         updateLecture(activeSection.id, item.id, {
                                                           videoUrl: e.target.value,
                                                         })
                                                       }
-                                                      placeholder="https://www.youtube.com/watch?v=…"
+                                                      placeholder="Paste a VdoCipher video ID or video URL"
                                                       className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                                                     />
                                                   </div>
@@ -2444,13 +2444,13 @@ export default function AdminCourseNewPage() {
                                       </div>
                                       <div className="space-y-1.5">
                                         <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                          Video URL (Vimeo/YouTube)
+                                          Lesson video
                                         </label>
                                         <input
-                                          type="url"
+                                          type="text"
                                           value={draftLessonVideoUrl}
                                           onChange={(e) => setDraftLessonVideoUrl(e.target.value)}
-                                          placeholder="https://vimeo.com/…"
+                                          placeholder="Paste a VdoCipher video ID or video URL"
                                           className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                                         />
                                       </div>
@@ -2712,7 +2712,7 @@ export default function AdminCourseNewPage() {
                                   Media item {index + 1}
                                 </p>
                                 <p className="text-xs text-zinc-500">
-                                  Add a hosted image/video URL or a YouTube link.
+                                  Add an image URL, direct video URL, YouTube link, or VdoCipher video ID.
                                 </p>
                               </div>
                               <Button
@@ -2746,10 +2746,10 @@ export default function AdminCourseNewPage() {
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-sm font-medium text-zinc-700">
-                                  Source URL
+                                  Source
                                 </label>
                                 <input
-                                  type="url"
+                                  type="text"
                                   value={item.src}
                                   onChange={(e) =>
                                     updateReviewMediaItem(item.id, { src: e.target.value })
@@ -2757,7 +2757,9 @@ export default function AdminCourseNewPage() {
                                   placeholder={
                                     item.kind === "youtube"
                                       ? "https://www.youtube.com/watch?v=..."
-                                      : "https://example.com/media-file"
+                                      : item.kind === "video"
+                                        ? "Paste a VdoCipher video ID or direct video URL"
+                                        : "https://example.com/media-file"
                                   }
                                   className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                                 />
@@ -2887,13 +2889,13 @@ export default function AdminCourseNewPage() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                        Video URL (Vimeo/YouTube)
+                        Lesson video
                       </label>
                       <input
-                        type="url"
+                        type="text"
                         value={draftLessonVideoUrl}
                         onChange={(e) => setDraftLessonVideoUrl(e.target.value)}
-                        placeholder="https://vimeo.com/…"
+                        placeholder="Paste a VdoCipher video ID or video URL"
                         className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400/40"
                       />
                     </div>
@@ -3193,12 +3195,12 @@ export default function AdminCourseNewPage() {
                         )}
                       </FormField>
 
-                      <FormField name="videoPreviewUrl" label="Course Video Preview URL">
+                      <FormField name="videoPreviewUrl" label="Course Video Preview">
                         {({ id, error, ...rest }) => (
                           <FormInput
                             id={id}
                             error={error}
-                            placeholder="https://www.youtube.com/watch?v=…"
+                            placeholder="Paste a VdoCipher video ID or video URL"
                             className="rounded-xl border-zinc-200"
                             {...rest}
                           />

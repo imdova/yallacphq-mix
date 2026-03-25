@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 
 type LessonResource = { label: string; href: string };
 
@@ -403,13 +404,11 @@ export function CphqFreeLectureViewer() {
                   className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md"
                 >
                   <div className="relative aspect-video w-full bg-zinc-900">
-                    <iframe
-                      className="absolute inset-0 h-full w-full"
-                      src={`https://www.youtube.com/embed/${v.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
+                    <MediaVideoPlayer
+                      source={v.youtubeId}
                       title={v.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      referrerPolicy="strict-origin-when-cross-origin"
+                      access="public"
+                      className="h-full w-full"
                     />
                   </div>
                   <div className="p-3">
@@ -561,13 +560,12 @@ export function CphqFreeLectureViewer() {
           <div className="space-y-6">
             <Card className="overflow-hidden rounded-2xl border-zinc-200/80 bg-white shadow-md ring-1 ring-zinc-200/50">
               <div className="relative aspect-video w-full bg-zinc-900">
-                <iframe
-                  className="absolute inset-0 h-full w-full"
-                  src={`https://www.youtube.com/embed/${activeLesson.youtubeId}?autoplay=1&mute=0&rel=0&modestbranding=1&playsinline=1`}
+                <MediaVideoPlayer
+                  source={activeLesson.youtubeId}
                   title={activeLesson.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
+                  access="public"
+                  autoPlay
+                  className="h-full w-full"
                 />
               </div>
               <div className="border-t border-zinc-100 bg-zinc-50/50 p-4">

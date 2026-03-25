@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 
 const HERO_VIDEO_ID = "9JJYT8ajOKg";
 
@@ -51,12 +52,11 @@ export function Hero() {
         </div>
         <div className="relative mt-8 md:block lg:mt-0">
           <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gold/20 shadow-2xl shadow-black/50 ring-1 ring-white/5">
-            <iframe
-              src={`https://www.youtube.com/embed/${HERO_VIDEO_ID}?rel=0&modestbranding=1`}
+            <MediaVideoPlayer
+              source={HERO_VIDEO_ID}
               title="Yalla CPHQ – Healthcare Quality"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 h-full w-full"
+              access="public"
+              className="h-full w-full"
             />
           </div>
         </div>

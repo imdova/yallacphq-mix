@@ -43,7 +43,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { getErrorMessage } from "@/lib/api/error";
 import { getCourseCurriculumCounts } from "@/lib/course-learning";
-import { youtubeEmbedUrl, youtubeThumbUrl } from "./reviewMedia";
+import { getYouTubeThumbnailUrl } from "@/lib/video-source";
+import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 
 const FOOTER_PROGRAMS = [
   "CPHQ Preparation",
@@ -98,114 +99,6 @@ function splitSentences(input: string, max = 6): string[] {
     .map((s) => s.replace(/[.!?]+$/, "").trim())
     .filter(Boolean);
   return parts.slice(0, max);
-}
-
-function getYouTubeId(input?: string): string | null {
-  if (!input) return null;
-  const raw = input.trim();
-  if (!raw) return null;
-  // Already an id
-  if (/^[a-zA-Z0-9_-]{8,20}$/.test(raw)) return raw;
-  try {
-    const url = new URL(raw);
-    const v = url.searchParams.get("v");
-    if (v) return v;
-    if (url.hostname.includes("youtu.be")) {
-      const id = url.pathname.split("/").filter(Boolean)[0];
-      return id || null;
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    const embedIdx = parts.findIndex((p) => p === "embed");
-    if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-interface YouTubePlayer {
-  destroy?: () => void;
-}
-
-function YouTubePreviewPlayer({ videoId }: { videoId: string }) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const playerRef = React.useRef<YouTubePlayer | null>(null);
-
-  React.useEffect(() => {
-    if (!containerRef.current || !videoId) return;
-
-    const loadYouTubeAPI = (): Promise<void> =>
-      new Promise((resolve) => {
-        if (
-          typeof window !== "undefined" &&
-          (window as unknown as { YT?: { Player?: unknown } }).YT?.Player
-        ) {
-          resolve();
-          return;
-        }
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        const firstScript = document.getElementsByTagName("script")[0];
-        firstScript?.parentNode?.insertBefore(tag, firstScript);
-        (window as unknown as { onYouTubeIframeAPIReady?: () => void }).onYouTubeIframeAPIReady =
-          () => resolve();
-      });
-
-    let mounted = true;
-    loadYouTubeAPI().then(() => {
-      if (!mounted || !containerRef.current) return;
-      const win = window as unknown as {
-        YT: {
-          Player: new (
-            el: string | HTMLElement,
-            opts: {
-              videoId: string;
-              width?: string;
-              height?: string;
-              playerVars?: Record<string, number>;
-              events?: {
-                onReady?: (e: { target: { unMute?: () => void; playVideo?: () => void } }) => void;
-              };
-            }
-          ) => YouTubePlayer;
-        };
-      };
-      playerRef.current = new win.YT.Player(containerRef.current, {
-        videoId,
-        width: "100%",
-        height: "100%",
-        playerVars: {
-          autoplay: 1,
-          mute: 1,
-          rel: 0,
-          modestbranding: 1,
-        },
-        events: {
-          onReady(e: { target: { unMute?: () => void; playVideo?: () => void } }) {
-            e.target.unMute?.();
-            e.target.playVideo?.();
-          },
-        },
-      });
-    });
-    return () => {
-      mounted = false;
-      if (playerRef.current?.destroy) playerRef.current.destroy();
-    };
-  }, [videoId]);
-
-  return (
-    <div className="rounded-3xl bg-gradient-to-r from-gold/80 via-gold to-gold/80 p-[3px] shadow-2xl shadow-gold/20">
-      <div className="w-full min-w-0 overflow-hidden rounded-2xl bg-black/30 shadow-2xl shadow-black/50 ring-1 ring-white/5">
-        <div className="aspect-video min-h-0 w-full">
-          <div
-            ref={containerRef}
-            className="relative h-full w-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full"
-          />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function Reveal({
@@ -418,7 +311,8 @@ export function CourseDetailsView() {
     displayCourse.imageUrl?.startsWith("http") || displayCourse.imageUrl?.startsWith("data:")
       ? displayCourse.imageUrl
       : null;
-  const videoId = getYouTubeId(displayCourse.videoPreviewUrl);
+  const previewVideoSource = displayCourse.videoPreviewUrl?.trim() ?? "";
+  const hasPreviewVideo = Boolean(previewVideoSource);
   const curriculumSections = displayCourse.curriculumSections ?? [];
   const totalModules = curriculumSections.length;
   const curriculumCounts = getCourseCurriculumCounts(displayCourse);
@@ -615,6 +509,16 @@ export function CourseDetailsView() {
                   {enrolledCount.toLocaleString()} Students
                 </span>
 
+                <span className="inline-flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-gold/80" />
+                  {totalLessons} {totalLessons === 1 ? "Lesson" : "Lessons"}
+                </span>
+
+                <span className="inline-flex items-center gap-2">
+                  <FileQuestion className="h-4 w-4 text-gold/80" />
+                  {totalQuizzes} {totalQuizzes === 1 ? "Quiz" : "Quizzes"}
+                </span>
+
                 <span className="inline-flex items-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-gold ring-1 ring-white/5">
                   <Star className="h-4 w-4 fill-gold text-gold" />
                   {reviewCount.toLocaleString()} reviews
@@ -633,8 +537,19 @@ export function CourseDetailsView() {
               <div className="flex w-full min-w-0 justify-center lg:justify-start">
                 <div className="w-full min-w-0 lg:w-[96%]">
                   <Reveal delayMs={140}>
-                    {videoId ? (
-                      <YouTubePreviewPlayer videoId={videoId} />
+                    {hasPreviewVideo ? (
+                      <div className="rounded-3xl bg-gradient-to-r from-gold/80 via-gold to-gold/80 p-[3px] shadow-2xl shadow-gold/20">
+                        <div className="w-full min-w-0 overflow-hidden rounded-2xl bg-black/30 shadow-2xl shadow-black/50 ring-1 ring-white/5">
+                          <div className="relative aspect-video min-h-0 w-full">
+                            <MediaVideoPlayer
+                              source={previewVideoSource}
+                              title={title}
+                              access="public"
+                              className="h-full w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl border border-gold/20 bg-black/25 shadow-2xl shadow-black/50 ring-1 ring-white/5">
                         {heroBgUrl ? (
@@ -1316,7 +1231,7 @@ export function CourseDetailsView() {
                         const tileThumb = (m: CourseReviewMediaItem): string | undefined => {
                           if (m.kind === "image") return m.src;
                           if (m.kind === "video") return m.poster;
-                          return youtubeThumbUrl(m.src) ?? undefined;
+                          return getYouTubeThumbnailUrl(m.src) ?? undefined;
                         };
 
                         const Tile = ({
@@ -1450,22 +1365,18 @@ export function CourseDetailsView() {
                             className="object-contain"
                             unoptimized={activeReviewMedia.src.startsWith("http")}
                           />
-                        ) : activeReviewMedia.kind === "video" ? (
-                          <video
-                            src={activeReviewMedia.src}
-                            poster={activeReviewMedia.poster}
-                            controls
-                            autoPlay
-                            playsInline
-                            className="h-full w-full object-contain"
-                          />
                         ) : (
-                          <iframe
-                            title={activeReviewMedia.caption ?? "YouTube review"}
-                            src={youtubeEmbedUrl(activeReviewMedia.src) ?? undefined}
+                          <MediaVideoPlayer
+                            source={activeReviewMedia.src}
+                            poster={
+                              activeReviewMedia.kind === "video"
+                                ? activeReviewMedia.poster
+                                : undefined
+                            }
+                            title={activeReviewMedia.caption ?? "Student review video"}
+                            access="public"
+                            autoPlay
                             className="h-full w-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            allowFullScreen
                           />
                         )}
                       </div>
@@ -1540,10 +1451,10 @@ export function CourseDetailsView() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-zinc-900">
-                          {videoId ? "Contains video" : "Course media"}
+                          {hasPreviewVideo ? "Contains video" : "Course media"}
                         </p>
                         <p className="text-xs text-zinc-500">
-                          {videoId ? "Preview + full lessons" : "Cover and course assets"}
+                          {hasPreviewVideo ? "Preview + full lessons" : "Cover and course assets"}
                         </p>
                       </div>
                     </div>

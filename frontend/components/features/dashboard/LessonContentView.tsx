@@ -121,6 +121,7 @@ export function LessonContentView({
             title={lesson.title}
             access="course_lesson"
             courseId={courseId}
+            lessonId={lesson.id}
             fallback={
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-white/80">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">

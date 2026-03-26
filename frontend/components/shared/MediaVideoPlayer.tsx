@@ -11,6 +11,8 @@ type MediaVideoPlayerProps = {
   title: string;
   access?: "public" | "course_lesson";
   courseId?: string;
+  /** When set with `access="course_lesson"`, server may allow VdoCipher OTP for marked free previews. */
+  lessonId?: string;
   autoPlay?: boolean;
   poster?: string;
   className?: string;
@@ -28,6 +30,7 @@ export function MediaVideoPlayer({
   title,
   access = "public",
   courseId,
+  lessonId,
   autoPlay = false,
   poster,
   className,
@@ -54,6 +57,7 @@ export function MediaVideoPlayer({
             videoId,
             access,
             courseId,
+            ...(lessonId ? { lessonId } : {}),
           }),
         });
 
@@ -96,7 +100,7 @@ export function MediaVideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, [access, courseId, parsed]);
+  }, [access, courseId, lessonId, parsed]);
 
   if (parsed.kind === "empty") {
     return (

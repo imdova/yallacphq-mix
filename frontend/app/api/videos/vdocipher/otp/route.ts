@@ -1,14 +1,77 @@
 import { ZodError, z } from "zod";
 import { jsonError, jsonOk, zodIssues } from "@/lib/api/route-helpers";
 import { getRequestIdFromRequest, newRequestId } from "@/lib/api/request-id";
-import { publicCoursesResponseSchema } from "@/lib/api/contracts/course";
+import {
+  publicCourseResponseSchema,
+  publicCoursesResponseSchema,
+} from "@/lib/api/contracts/course";
 import { BACKEND_API_PREFIX, getBackendUrl, isBackendConfigured } from "@/lib/api/backend-url";
 import { requireSession } from "@/lib/auth/server";
+import { getCourseById } from "@/lib/db/courses";
+import type { Course } from "@/types/course";
+import { getVdoCipherVideoId } from "@/lib/video-source";
+
+function isFreeCourse(course: { priceRegular?: number; priceSale?: number } | null | undefined) {
+  const regular = course?.priceRegular ?? 0;
+  const sale = course?.priceSale;
+  const hasSale = sale != null && sale > 0 && regular > sale;
+  const displayPrice = hasSale ? sale : regular;
+  return displayPrice === 0;
+}
+
+async function loadPublishedCourse(courseId: string): Promise<Course | null> {
+  if (isBackendConfigured()) {
+    try {
+      const res = await fetch(
+        `${getBackendUrl()}${BACKEND_API_PREFIX}/courses/${encodeURIComponent(courseId)}`,
+        {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(15000),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return null;
+      const parsed = publicCourseResponseSchema.safeParse(data);
+      return parsed.success ? (parsed.data.course as Course) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const course = await getCourseById(courseId);
+  if (!course || (course.status ?? "published") !== "published") {
+    return null;
+  }
+
+  return course as Course;
+}
+
+function isFreePreviewVdoCipherLesson(
+  course: Course,
+  lessonId: string,
+  requestedVideoId: string,
+): boolean {
+  const want = requestedVideoId.trim().toLowerCase();
+  if (!want) return false;
+
+  for (const section of course.curriculumSections ?? []) {
+    for (const item of section.items ?? []) {
+      if (item.type !== "lecture" || item.id !== lessonId) continue;
+      if (!item.freeLecture) return false;
+      const fromUrl = getVdoCipherVideoId(item.videoUrl ?? "");
+      return fromUrl !== null && fromUrl.toLowerCase() === want;
+    }
+  }
+
+  return false;
+}
 
 const otpRequestSchema = z.object({
   videoId: z.string().trim().min(1),
   access: z.enum(["public", "course_lesson"]).default("public"),
   courseId: z.string().trim().min(1).optional(),
+  lessonId: z.string().trim().min(1).optional(),
 });
 
 const otpResponseSchema = z.object({
@@ -22,10 +85,28 @@ export const dynamic = "force-dynamic";
 async function ensureCourseLessonAccess(
   req: Request,
   courseId: string | undefined,
+  lessonId: string | undefined,
+  videoId: string,
   requestId: string,
 ): Promise<Response | null> {
   if (!courseId) {
     return jsonError(400, "courseId is required for protected lesson playback", { requestId });
+  }
+
+  const published = await loadPublishedCourse(courseId);
+  if (!published) {
+    return jsonError(404, "Course not found", { requestId });
+  }
+
+  if (
+    lessonId &&
+    isFreePreviewVdoCipherLesson(published, lessonId, videoId)
+  ) {
+    return null;
+  }
+
+  if (isFreeCourse(published)) {
+    return null;
   }
 
   if (!isBackendConfigured()) {
@@ -82,7 +163,13 @@ export async function POST(req: Request) {
     const body = otpRequestSchema.parse(await req.json());
 
     if (body.access === "course_lesson") {
-      const accessError = await ensureCourseLessonAccess(req, body.courseId, requestId);
+      const accessError = await ensureCourseLessonAccess(
+        req,
+        body.courseId,
+        body.lessonId,
+        body.videoId,
+        requestId,
+      );
       if (accessError) return accessError;
     }
 

@@ -26,6 +26,7 @@ import {
   FileQuestion,
   Globe,
   ImageIcon,
+  Lock,
   Video,
   Settings,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import { CourseCard } from "@/components/features/courses/CourseCard";
 import { CoursesHeader } from "@/components/features/courses/CoursesHeader";
 import {
   enrollCourse,
+  getMyCourses,
   getPublicCourse,
   getPublicCourses,
   getRelatedCourses,
@@ -43,7 +45,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { getErrorMessage } from "@/lib/api/error";
 import { getCourseCurriculumCounts } from "@/lib/course-learning";
-import { getYouTubeThumbnailUrl } from "@/lib/video-source";
+import { getYouTubeThumbnailUrl, parseVideoSource } from "@/lib/video-source";
 import { MediaVideoPlayer } from "@/components/shared/MediaVideoPlayer";
 
 const FOOTER_PROGRAMS = [
@@ -212,6 +214,26 @@ export function CourseDetailsView() {
   const [enrolling, setEnrolling] = React.useState(false);
   const [enrollError, setEnrollError] = React.useState<string | null>(null);
   const [enrollSuccess, setEnrollSuccess] = React.useState(false);
+  const [isEnrolled, setIsEnrolled] = React.useState(false);
+
+  React.useEffect(() => {
+    if (status !== "authenticated" || !courseId) {
+      setIsEnrolled(false);
+      return;
+    }
+    let cancelled = false;
+    getMyCourses()
+      .then((items) => {
+        if (!cancelled) setIsEnrolled(items.some((c) => c.id === courseId));
+      })
+      .catch(() => {
+        if (!cancelled) setIsEnrolled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, courseId]);
+
   React.useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -1027,46 +1049,94 @@ export function CourseDetailsView() {
                                   <div className="border-t border-zinc-200 bg-zinc-50/60">
                                     {section.items?.length ? (
                                       <div className="divide-y divide-zinc-200">
-                                        {section.items.map((item: CourseCurriculumItem) => (
-                                          <div
-                                            key={item.id}
-                                            className="flex items-center justify-between gap-4 px-4 py-3"
-                                          >
-                                            <div className="flex min-w-0 items-center gap-3">
-                                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200">
-                                                {item.type === "lecture" ? (
-                                                  <PlayCircle className="h-4 w-4" />
-                                                ) : (
-                                                  <BookOpen className="h-4 w-4" />
-                                                )}
-                                              </span>
-                                              <div className="min-w-0">
-                                                <span className="block min-w-0 text-sm text-zinc-700">
-                                                  {item.title}
-                                                </span>
-                                                {item.type === "lecture" && item.materialUrl ? (
-                                                  <a
-                                                    href={item.materialUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-xs font-medium text-gold hover:underline"
-                                                  >
-                                                    Open material
-                                                  </a>
+                                        {section.items.map((item: CourseCurriculumItem) => {
+                                          const isLecture = item.type === "lecture";
+                                          const videoSrc =
+                                            isLecture ? (item.videoUrl?.trim() ?? "") : "";
+                                          const canWatchLesson =
+                                            isLecture &&
+                                            videoSrc.length > 0 &&
+                                            (Boolean(item.freeLecture) || isEnrolled);
+                                          const vdoParsed =
+                                            isLecture && videoSrc ? parseVideoSource(videoSrc) : null;
+
+                                          return (
+                                            <div key={item.id} className="px-4 py-3">
+                                              <div className="flex items-start justify-between gap-4">
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-zinc-200">
+                                                    {item.type === "lecture" ? (
+                                                      <PlayCircle className="h-4 w-4" />
+                                                    ) : (
+                                                      <BookOpen className="h-4 w-4" />
+                                                    )}
+                                                  </span>
+                                                  <div className="min-w-0">
+                                                    <span className="block min-w-0 text-sm text-zinc-700">
+                                                      {item.title}
+                                                    </span>
+                                                    {item.type === "lecture" && item.materialUrl ? (
+                                                      <a
+                                                        href={item.materialUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-xs font-medium text-gold hover:underline"
+                                                      >
+                                                        Open material
+                                                      </a>
+                                                    ) : null}
+                                                  </div>
+                                                </div>
+                                                {item.type === "lecture" && item.freeLecture ? (
+                                                  <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                    Free lesson
+                                                  </span>
+                                                ) : item.type === "quiz" ? (
+                                                  <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">
+                                                    Quiz
+                                                  </span>
                                                 ) : null}
                                               </div>
+                                              {isLecture && videoSrc ? (
+                                                canWatchLesson ? (
+                                                  <div className="relative mt-3 aspect-video w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-200 bg-black shadow-sm">
+                                                    <MediaVideoPlayer
+                                                      source={videoSrc}
+                                                      title={item.title}
+                                                      access={
+                                                        vdoParsed?.kind === "vdocipher"
+                                                          ? "course_lesson"
+                                                          : "public"
+                                                      }
+                                                      courseId={
+                                                        vdoParsed?.kind === "vdocipher" && course?.id
+                                                          ? course.id
+                                                          : undefined
+                                                      }
+                                                      lessonId={
+                                                        vdoParsed?.kind === "vdocipher"
+                                                          ? item.id
+                                                          : undefined
+                                                      }
+                                                    />
+                                                  </div>
+                                                ) : (
+                                                  <div className="mt-3 flex max-w-2xl items-start gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 shadow-sm">
+                                                    <Lock
+                                                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500"
+                                                      aria-hidden
+                                                    />
+                                                    <span>
+                                                      Purchase this course to watch. Lessons labeled
+                                                      &quot;Free lesson&quot; can be watched here
+                                                      without enrolling.
+                                                    </span>
+                                                  </div>
+                                                )
+                                              ) : null}
                                             </div>
-                                            {item.type === "lecture" && item.freeLecture ? (
-                                              <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                                Free lesson
-                                              </span>
-                                            ) : item.type === "quiz" ? (
-                                              <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600">
-                                                Quiz
-                                              </span>
-                                            ) : null}
-                                          </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       <div className="px-4 py-4 text-sm text-zinc-600">

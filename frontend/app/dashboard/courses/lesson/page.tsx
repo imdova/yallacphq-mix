@@ -9,7 +9,7 @@ import { LessonContentView } from "@/components/features/dashboard/LessonContent
 import { CourseQuizPlayer } from "@/components/features/dashboard/CourseQuizPlayer";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { getMyCourses } from "@/lib/dal/courses";
+import { getMyCourses, getPublicCourse } from "@/lib/dal/courses";
 import { getCourseQuizById } from "@/lib/dal/quizzes";
 import { getErrorMessage } from "@/lib/api/error";
 import type { Course, CourseCurriculumLecture } from "@/types/course";
@@ -25,6 +25,14 @@ type FlattenedLecture = CourseCurriculumLecture & {
   sectionTitle: string;
   sectionDescription?: string;
 };
+
+function isFreeCourse(course: Pick<Course, "priceRegular" | "priceSale"> | null | undefined) {
+  const regular = course?.priceRegular ?? 0;
+  const sale = course?.priceSale;
+  const hasSale = sale != null && sale > 0 && regular > sale;
+  const displayPrice = hasSale ? sale : regular;
+  return displayPrice === 0;
+}
 
 function buildLessonHref(courseId: string, lessonId: string): string {
   const params = new URLSearchParams();
@@ -308,38 +316,51 @@ export default function LessonPage() {
   const [activeQuiz, setActiveQuiz] = React.useState<AdminStoredQuiz | null>(null);
   const [quizLoading, setQuizLoading] = React.useState(false);
   const [quizLoadError, setQuizLoadError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    getMyCourses()
-      .then((items) => {
-        if (!cancelled) {
-          setCourses(items);
-          setLoadError(null);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setCourses([]);
-          setLoadError(getErrorMessage(error, "Failed to load your courses"));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const courseId = searchParams.get("course")?.trim() ?? "";
   const lessonId = searchParams.get("lesson")?.trim() ?? "";
   const quizId = searchParams.get("quiz")?.trim() ?? "";
   const quizStarted = searchParams.get("quizStart") === "1";
   const quizMode = searchParams.get("mode");
   const isStudyMode = quizMode === "study";
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      const [myCoursesResult, publicCourseResult] = await Promise.all([
+        getMyCourses()
+          .then((items) => ({ items, error: null as unknown }))
+          .catch((error: unknown) => ({ items: [] as Course[], error })),
+        courseId ? getPublicCourse(courseId) : Promise.resolve(null),
+      ]);
+
+      if (cancelled) return;
+
+      const accessibleFreeCourse =
+        publicCourseResult && isFreeCourse(publicCourseResult) ? publicCourseResult : null;
+
+      const nextCourses = myCoursesResult.items.slice();
+      if (
+        accessibleFreeCourse &&
+        !nextCourses.some((course) => course.id === accessibleFreeCourse.id)
+      ) {
+        nextCourses.push(accessibleFreeCourse);
+      }
+
+      setCourses(nextCourses);
+      setLoadError(
+        myCoursesResult.error && !accessibleFreeCourse
+          ? getErrorMessage(myCoursesResult.error, "Failed to load your courses")
+          : null,
+      );
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
   const activeCourse = React.useMemo(() => {
     if (!courses.length) return null;
     if (courseId) return courses.find((course) => course.id === courseId) ?? null;

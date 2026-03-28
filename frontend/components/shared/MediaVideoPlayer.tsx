@@ -17,6 +17,11 @@ type MediaVideoPlayerProps = {
   poster?: string;
   className?: string;
   fallback?: React.ReactNode;
+  /**
+   * Light UX friction for protected playback (not real DRM). Does not stop DevTools or the Network tab.
+   * @default true when access is "course_lesson"
+   */
+  deterCasualCopy?: boolean;
 };
 
 type VdoCipherOtpResponse = {
@@ -35,7 +40,9 @@ export function MediaVideoPlayer({
   poster,
   className,
   fallback,
+  deterCasualCopy: deterCasualCopyProp,
 }: MediaVideoPlayerProps) {
+  const deterCasualCopy = deterCasualCopyProp ?? access === "course_lesson";
   const parsed = React.useMemo(() => parseVideoSource(source), [source]);
   const [embedUrl, setEmbedUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -122,6 +129,13 @@ export function MediaVideoPlayer({
     );
   }
 
+  const shellProps = deterCasualCopy
+    ? {
+        onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+        className: cn("relative h-full w-full select-none", className),
+      }
+    : { className: cn("relative h-full w-full", className) };
+
   if (parsed.kind === "youtube") {
     const params = new URLSearchParams({
       rel: "0",
@@ -131,9 +145,9 @@ export function MediaVideoPlayer({
     });
 
     return (
-      <div className={cn("relative h-full w-full", className)}>
+      <div {...shellProps}>
         <iframe
-          className="absolute inset-0 h-full w-full"
+          className="pointer-events-auto absolute inset-0 h-full w-full"
           src={`https://www.youtube.com/embed/${parsed.videoId}?${params.toString()}`}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -146,12 +160,14 @@ export function MediaVideoPlayer({
 
   if (parsed.kind === "direct") {
     return (
-      <div className={cn("relative h-full w-full bg-black", className)}>
+      <div {...shellProps}>
         <video
           className="h-full w-full object-contain"
           src={parsed.url}
           poster={poster}
           controls
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
           playsInline
           autoPlay={autoPlay}
         >
@@ -162,7 +178,7 @@ export function MediaVideoPlayer({
   }
 
   return (
-    <div className={cn("relative h-full w-full bg-black", className)}>
+    <div {...shellProps}>
       {loading ? (
         <div className="absolute inset-0 flex items-center justify-center text-white/80">
           <div className="flex items-center gap-2 text-sm">
@@ -184,11 +200,12 @@ export function MediaVideoPlayer({
         </div>
       ) : embedUrl ? (
         <iframe
-          className="absolute inset-0 h-full w-full"
+          className="pointer-events-auto absolute inset-0 h-full w-full"
           src={embedUrl}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
         />
       ) : null}
     </div>
